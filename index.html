@@ -572,9 +572,51 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
 <!-- Modal Sheets removido — substituído pelo Supabase -->
 
 <script>
-const FUNCS=["Fotógrafo","Design","Social Media","Videomaker","Tráfego Pago","Copywriter"];
+let FUNCS=["Fotógrafo","Design","Social Media","Videomaker","Tráfego Pago","Copywriter"];
 const SC={entregue:{label:"Entregue",cls:"b-entregue",icon:"ti-circle-check"},andamento:{label:"Em andamento",cls:"b-andamento",icon:"ti-loader"},atrasado:{label:"Atrasado",cls:"b-atrasado",icon:"ti-alert-circle"},revisao:{label:"Em revisão",cls:"b-revisao",icon:"ti-eye"},pendente:{label:"Pendente",cls:"b-pendente",icon:"ti-clock"}};
-const FP={"Fotógrafo":"fp-foto","Design":"fp-design","Social Media":"fp-social","Videomaker":"fp-video","Tráfego Pago":"fp-trafego","Copywriter":"fp-copy"};
+const FP_CORES=["fp-foto","fp-design","fp-social","fp-video","fp-trafego","fp-copy","fp-foto","fp-design"];
+let FP={"Fotógrafo":"fp-foto","Design":"fp-design","Social Media":"fp-social","Videomaker":"fp-video","Tráfego Pago":"fp-trafego","Copywriter":"fp-copy"};
+
+function reconstruirFP(){
+  FP={};
+  FUNCS.forEach((f,i)=>{FP[f]=FP_CORES[i%FP_CORES.length];});
+}
+
+async function carregarFuncoes(){
+  try{
+    const rows=await sbGet('funcoes','select=*&order=nome');
+    if(rows&&rows.length>0){
+      FUNCS=rows.map(r=>r.nome);
+      reconstruirFP();
+      atualizarSelectsFuncao();
+    }
+  }catch(e){
+    // Tabela ainda não existe — usa padrão
+    reconstruirFP();
+    atualizarSelectsFuncao();
+  }
+}
+
+function atualizarSelectsFuncao(){
+  // Select do formulário de novo entregável
+  const sel=document.getElementById('f-func');
+  if(sel){
+    const val=sel.value;
+    sel.innerHTML='<option value="">Selecione...</option>'+FUNCS.map(f=>`<option value="${f}"${f===val?' selected':''}>${f}</option>`).join('');
+  }
+  // Select do filtro de funções
+  const selF=document.getElementById('f-funcao');
+  if(selF){
+    const val=selF.value;
+    selF.innerHTML='<option value="">Todas as funções</option>'+FUNCS.map(f=>`<option value="${f}"${f===val?' selected':''}>${f}</option>`).join('');
+  }
+  // Select do modal de edição
+  const selE=document.getElementById('e-func');
+  if(selE){
+    const val=selE.value;
+    selE.innerHTML='<option value="">Selecione...</option>'+FUNCS.map(f=>`<option value="${f}"${f===val?' selected':''}>${f}</option>`).join('');
+  }
+}
 const AV_COLORS=["#2B3FD4","#D4960A","#16a34a","#dc2626","#7c3aed","#0891b2","#db2777","#059669"];
 let dados=[];
 let comentarios={};
@@ -1285,6 +1327,7 @@ async function fazerLogin(){
         document.getElementById('gs-btn').style.display='none';
       }
       await _carregarDadosCliente();
+      await carregarFuncoes();
       renderDashboard();
       // Atualiza dados a cada 60s em tempo real
       setInterval(()=>_carregarDadosCliente(),60000);
@@ -1355,32 +1398,169 @@ function logout(){
   document.getElementById('btn-login').disabled=false;
 }
 
-function abrirModalAdmin(){
-  const opts=_empresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
+async function abrirModalAdmin(){
   const div=document.createElement('div');
+  div.id='modal-admin-bg';
   div.style.cssText='position:fixed;inset:0;background:rgba(18,19,42,.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)';
   div.onclick=e=>{if(e.target===div)div.remove();};
-  div.innerHTML=`<div style="background:#fff;border-radius:12px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(43,63,212,.2)">
-    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);background:linear-gradient(135deg,var(--blue-light),#fff);display:flex;align-items:center;justify-content:space-between">
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(43,63,212,.2)">
+    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);background:linear-gradient(135deg,var(--blue-light),#fff);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;border-radius:12px 12px 0 0">
       <h2 style="font-size:15px;font-weight:700;color:var(--blue)"><i class="ti ti-settings" style="margin-right:6px"></i>Administração</h2>
-      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#9090b0">✕</button>
+      <button onclick="document.getElementById('modal-admin-bg').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#9090b0">✕</button>
     </div>
-    <div style="padding:1.25rem 1.5rem">
-      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px">Nova empresa</div>
-      <div style="display:flex;gap:8px;margin-bottom:20px">
-        <input id="adm-empresa" type="text" placeholder="Nome da empresa" style="flex:1;font-size:13px;padding:9px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif">
-        <button onclick="admAddEmpresa()" style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer">Adicionar</button>
+    <div style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:20px">
+
+      <!-- EMPRESAS -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-building" style="color:var(--blue)"></i> Empresas</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="adm-empresa" type="text" placeholder="Nome da empresa" style="flex:1;font-size:13px;padding:9px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif">
+          <button onclick="admAddEmpresa()" style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;white-space:nowrap"><i class="ti ti-plus"></i> Adicionar</button>
+        </div>
+        <select id="adm-busca-empresa" onchange="admFiltrarEmpresas()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)">
+          <option value="">— Ver todas as empresas —</option>
+        </select>
+        <div id="adm-lista-empresas" style="display:flex;flex-direction:column;gap:6px"></div>
       </div>
-      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px">Novo usuário cliente</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-        <div class="fg"><label>Usuário</label><input id="adm-user" type="text"></div>
-        <div class="fg"><label>Senha</label><input id="adm-pass" type="text"></div>
+
+      <div style="height:1px;background:var(--border)"></div>
+
+      <!-- FUNÇÕES DA EQUIPE -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-briefcase" style="color:var(--blue)"></i> Funções da equipe</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="adm-funcao" type="text" placeholder="Ex: Gestor de Tráfego" style="flex:1;font-size:13px;padding:9px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif">
+          <button onclick="admAddFuncao()" style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;white-space:nowrap"><i class="ti ti-plus"></i> Adicionar</button>
+        </div>
+        <select id="adm-busca-funcao" onchange="admFiltrarFuncoes()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)">
+          <option value="">— Ver todas as funções —</option>
+        </select>
+        <div id="adm-lista-funcoes" style="display:flex;flex-direction:column;gap:6px"></div>
       </div>
-      <div class="fg" style="margin-bottom:14px"><label>Empresa</label><select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%">${opts}</select></div>
-      <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer"><i class="ti ti-user-plus"></i> Criar usuário cliente</button>
+
+      <div style="height:1px;background:var(--border)"></div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-user-plus" style="color:var(--blue)"></i> Novo usuário cliente</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="fg"><label>Usuário</label><input id="adm-user" type="text"></div>
+          <div class="fg"><label>Senha</label><input id="adm-pass" type="password"></div>
+        </div>
+        <div class="fg" style="margin-bottom:12px"><label>Empresa</label>
+          <select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select>
+        </div>
+        <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer"><i class="ti ti-user-plus"></i> Criar usuário cliente</button>
+      </div>
+
+      <div style="height:1px;background:var(--border)"></div>
+
+      <!-- LISTA USUÁRIOS -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-users" style="color:var(--blue)"></i> Usuários cadastrados</div>
+        <select id="adm-busca-usuario" onchange="admFiltrarUsuarios()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)">
+          <option value="">— Ver todos os usuários —</option>
+        </select>
+        <div id="adm-lista-usuarios" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
     </div>
   </div>`;
   document.body.appendChild(div);
+  await admCarregarListas();
+}
+
+let _admFuncoes=[];
+
+function admFiltrarFuncoes(){
+  const q=document.getElementById('adm-busca-funcao')?.value||'';
+  const lista=document.getElementById('adm-lista-funcoes');
+  if(!lista)return;
+  if(!q){lista.innerHTML='';return;}
+  const filtradas=_admFuncoes.filter(f=>f.nome===q);
+  lista.innerHTML=filtradas.map(f=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm)">
+      <span class="func-pill ${FP[f.nome]||'fp-foto'}" style="font-size:11px">${f.nome}</span>
+      <span style="flex:1"></span>
+      <button onclick="admExcluirFuncao(${f.id},'${f.nome.replace(/'/g,"\\'")}')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:12px;padding:3px 6px;border-radius:4px" title="Excluir"><i class="ti ti-trash"></i></button>
+    </div>`).join('');
+}
+
+async function admAddFuncao(){
+  const nome=document.getElementById('adm-funcao')?.value.trim();
+  if(!nome){alert('Digite o nome da função');return;}
+  if(FUNCS.includes(nome)){alert('Essa função já existe!');return;}
+  try{
+    await sbPost('funcoes',{nome});
+    document.getElementById('adm-funcao').value='';
+    await carregarFuncoes();
+    await admCarregarListas();
+    atualizarSelectsFuncao();
+  }catch(e){alert('Erro: '+e);}
+}
+
+async function admExcluirFuncao(id,nome){
+  if(!confirm(`Excluir a função "${nome}"?`))return;
+  try{
+    await sbDelete('funcoes',id);
+    await carregarFuncoes();
+    await admCarregarListas();
+    atualizarSelectsFuncao();
+  }catch(e){alert('Erro ao excluir: '+e);}
+}
+
+let _admEmpresas=[];
+let _admUsuarios=[];
+
+function admFiltrarEmpresas(){
+  const q=document.getElementById('adm-busca-empresa')?.value||'';
+  const lista=document.getElementById('adm-lista-empresas');
+  if(!lista)return;
+  if(!q){lista.innerHTML='';return;}
+  const filtradas=_admEmpresas.filter(e=>e.nome===q);
+  lista.innerHTML=filtradas.map(e=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm)">
+      <i class="ti ti-building" style="color:var(--blue);font-size:14px"></i>
+      <span style="flex:1;font-size:13px;font-weight:500">${e.nome}</span>
+      <button onclick="admExcluirEmpresa(${e.id},'${e.nome.replace(/'/g,"\\'")}')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:12px;padding:3px 6px;border-radius:4px" title="Excluir"><i class="ti ti-trash"></i></button>
+    </div>`).join('');
+}
+
+function admFiltrarUsuarios(){
+  const q=document.getElementById('adm-busca-usuario')?.value||'';
+  const lista=document.getElementById('adm-lista-usuarios');
+  if(!lista)return;
+  if(!q){lista.innerHTML='';return;}
+  const filtrados=_admUsuarios.filter(u=>u.login===q);
+  lista.innerHTML=filtrados.map(u=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);flex-wrap:wrap">
+      <i class="ti ti-user" style="color:var(--blue);font-size:14px;flex-shrink:0"></i>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${u.login} <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;background:${u.perfil==='admin'?'var(--blue-light)':'var(--ok-bg)'};color:${u.perfil==='admin'?'var(--blue)':'var(--ok)'}">${u.perfil}</span></div>
+        <div style="font-size:11px;color:var(--text3)">${u.empresa||'—'}</div>
+      </div>
+      <button onclick="admAlterarSenha(${u.id},'${u.login.replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--border2);cursor:pointer;color:var(--text2);font-size:11px;padding:4px 8px;border-radius:4px;display:flex;align-items:center;gap:3px;white-space:nowrap"><i class="ti ti-key"></i> Senha</button>
+      <button onclick="admAlterarEmpresa(${u.id},'${u.login.replace(/'/g,"\\'")}','${(u.empresa||'').replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--border2);cursor:pointer;color:var(--text2);font-size:11px;padding:4px 8px;border-radius:4px;display:flex;align-items:center;gap:3px;white-space:nowrap"><i class="ti ti-building"></i> Empresa</button>
+      <button onclick="admExcluirUsuario(${u.id},'${u.login.replace(/'/g,"\\'")}')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:12px;padding:4px 6px;border-radius:4px"><i class="ti ti-trash"></i></button>
+    </div>`).join('');
+}
+
+async function admCarregarListas(){
+  const selEmp=document.getElementById('adm-emp');
+  // Funções
+  try{_admFuncoes=await sbGet('funcoes','select=*&order=nome');}catch(e){_admFuncoes=[];}
+  const selF=document.getElementById('adm-busca-funcao');
+  if(selF)selF.innerHTML='<option value="">— Ver todas as funções —</option>'+_admFuncoes.map(f=>`<option value="${f.nome}">${f.nome}</option>`).join('');
+  admFiltrarFuncoes();
+  // Empresas
+  _admEmpresas=await sbGet('empresas','select=*&order=nome');
+  if(selEmp)selEmp.innerHTML=_admEmpresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
+  const selE=document.getElementById('adm-busca-empresa');
+  if(selE)selE.innerHTML='<option value="">— Ver todas as empresas —</option>'+_admEmpresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
+  admFiltrarEmpresas();
+  // Usuários
+  _admUsuarios=await sbGet('usuarios','select=*&order=login');
+  const selU=document.getElementById('adm-busca-usuario');
+  if(selU)selU.innerHTML='<option value="">— Ver todos os usuários —</option>'+_admUsuarios.map(u=>`<option value="${u.login}">${u.login} (${u.empresa||'—'})</option>`).join('');
+  admFiltrarUsuarios();
 }
 
 async function admAddEmpresa(){
@@ -1390,10 +1570,17 @@ async function admAddEmpresa(){
     await sbPost('empresas',{nome});
     await _carregarEmpresas();
     document.getElementById('adm-empresa').value='';
-    const sel=document.getElementById('adm-emp');
-    if(sel)sel.innerHTML=_empresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
-    alert('Empresa "'+nome+'" adicionada!');
+    await admCarregarListas();
   }catch(e){alert('Erro: '+e);}
+}
+
+async function admExcluirEmpresa(id,nome){
+  if(!confirm(`Excluir a empresa "${nome}"? Os usuários vinculados a ela não serão excluídos.`))return;
+  try{
+    await sbDelete('empresas',id);
+    await _carregarEmpresas();
+    await admCarregarListas();
+  }catch(e){alert('Erro ao excluir: '+e);}
 }
 
 async function admAddUsuario(){
@@ -1405,8 +1592,52 @@ async function admAddUsuario(){
     await sbPost('usuarios',{login:u,senha:s,perfil:'cliente',empresa:e});
     document.getElementById('adm-user').value='';
     document.getElementById('adm-pass').value='';
+    await admCarregarListas();
     alert('Usuário "'+u+'" criado para '+e+'!');
   }catch(e){alert('Erro: '+e);}
+}
+
+async function admAlterarSenha(id,login){
+  const nova=prompt(`Nova senha para "${login}":`);
+  if(!nova||!nova.trim())return;
+  try{
+    await sbPatch('usuarios',id,{senha:nova.trim()});
+    alert('Senha alterada com sucesso!');
+  }catch(e){alert('Erro: '+e);}
+}
+
+async function admAlterarEmpresa(id,login,empresaAtual){
+  const opts=_empresas.map(e=>`<option value="${e.nome}"${e.nome===empresaAtual?' selected':''}>${e.nome}</option>`).join('');
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;background:rgba(18,19,42,.7);z-index:400;display:flex;align-items:center;justify-content:center;padding:1rem';
+  div.innerHTML=`<div style="background:#fff;border-radius:12px;padding:1.5rem;width:100%;max-width:360px;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+    <h3 style="font-size:14px;font-weight:700;color:var(--blue);margin-bottom:12px"><i class="ti ti-building" style="margin-right:6px"></i>Alterar empresa — ${login}</h3>
+    <select id="adm-nova-emp" style="width:100%;font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:14px">${opts}</select>
+    <div style="display:flex;gap:8px">
+      <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:9px;font-size:13px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:none;cursor:pointer">Cancelar</button>
+      <button onclick="admConfirmarEmpresa(${id},'${login}')" style="flex:1;padding:9px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer">Salvar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+async function admConfirmarEmpresa(id,login){
+  const nova=document.getElementById('adm-nova-emp')?.value;
+  if(!nova)return;
+  try{
+    await sbPatch('usuarios',id,{empresa:nova});
+    document.querySelectorAll('[style*="z-index: 400"], [style*="z-index:400"]').forEach(el=>el.remove());
+    await admCarregarListas();
+    alert(`Empresa de "${login}" alterada para "${nova}"!`);
+  }catch(e){alert('Erro: '+e);}
+}
+
+async function admExcluirUsuario(id,login){
+  if(!confirm(`Excluir o usuário "${login}"? Esta ação não pode ser desfeita.`))return;
+  try{
+    await sbDelete('usuarios',id);
+    await admCarregarListas();
+  }catch(e){alert('Erro ao excluir: '+e);}
 }
 
 document.getElementById('modal-edicao').addEventListener('click',function(e){if(e.target===this)fecharModalEdicao();});
