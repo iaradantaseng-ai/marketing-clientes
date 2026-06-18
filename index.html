@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NaCasa · Entregáveis Marketing</title>
+<script>
+// ══════════════════════════════════════════════
+//  CONFIGURAÇÃO SUPABASE — edite aqui
+// ══════════════════════════════════════════════
+const SUPABASE_URL = 'https://zaejvlqbfahpjbpzgmhd.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZWp2bHFiZmFocGpicHpnbWhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODYwMDUsImV4cCI6MjA5NzM2MjAwNX0.5gb1qq8zPEqdqRGObLWw0GoVCuiojwxwZPkSMmOdcmg';
+// ══════════════════════════════════════════════
+</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -561,18 +569,7 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
   </div>
 </div>
 
-<div class="modal-bg" id="modal-sheets">
-  <div class="sheets-modal">
-    <h2><i class="ti ti-table" style="font-size:18px;vertical-align:-2px;margin-right:8px"></i>Integração Google Sheets</h2>
-    <p>Cole a URL do Apps Script para sincronizar com a planilha em tempo real.</p>
-    <input class="gs-url-input" id="gs-url" type="url" placeholder="https://script.google.com/macros/s/...">
-    <div class="modal-foot">
-      <button class="btn btn-primary" onclick="salvarGS()"><i class="ti ti-link"></i> Conectar</button>
-      <button class="btn btn-ghost" onclick="fecharModalSheets()">Cancelar</button>
-      <button class="btn btn-danger-outline btn-sm" style="margin-left:auto" onclick="desconectarGS()">Desconectar</button>
-    </div>
-  </div>
-</div>
+<!-- Modal Sheets removido — substituído pelo Supabase -->
 
 <script>
 const FUNCS=["Fotógrafo","Design","Social Media","Videomaker","Tráfego Pago","Copywriter"];
@@ -1038,7 +1035,7 @@ function limpar(){['f-func','f-resp','f-foto','f-vinculo','f-ativ','f-prazo','f-
 function salvar(){
   const func=document.getElementById('f-func').value,resp=document.getElementById('f-resp').value.trim(),ativ=document.getElementById('f-ativ').value.trim(),prazo=document.getElementById('f-prazo').value,status=document.getElementById('f-status').value;
   if(!func||!resp||!ativ||!prazo||!status){alert('Preencha os campos obrigatórios (*)');return;}
-  const novo={id:nextId++,func,resp,foto:document.getElementById('f-foto').value.trim(),vinculo:document.getElementById('f-vinculo').value,ativ,prazo,entrega:document.getElementById('f-entrega').value,status,camp:document.getElementById('f-camp').value.trim(),prior:document.getElementById('f-prior').value,link:document.getElementById('f-link').value.trim(),obs:document.getElementById('f-obs').value.trim(),criadoEm:agora()};
+  const novo={id:nextId++,func,resp,foto:document.getElementById('f-foto').value.trim(),vinculo:document.getElementById('f-vinculo').value,ativ,prazo,entrega:document.getElementById('f-entrega').value,status,camp:document.getElementById('f-camp').value.trim(),prior:document.getElementById('f-prior').value,link:document.getElementById('f-link').value.trim(),obs:document.getElementById('f-obs').value.trim(),criadoEm:agora(),_isNew:true};
   const fotoVal=document.getElementById('f-foto').value.trim();
   if(fotoVal&&novo.resp){fotosEquipe[novo.resp]=fotoVal;saveFotos();}
   dados.push(novo);adicionarHistorico(novo.id,'Entregável criado');saveLocal();populateFilterSelects();syncGS(novo);limpar();
@@ -1141,8 +1138,72 @@ async function deletarGS(id){
   try{await fetch(gsUrl+'?data='+payload,{cache:'no-store'});}
   catch(e){try{await fetch(gsUrl+'?data='+payload,{mode:'no-cors'});}catch(e2){}}
 }
-document.getElementById('modal-edicao').addEventListener('click',function(e){if(e.target===this)fecharModalEdicao();});
-document.getElementById('modal-sheets').addEventListener('click',function(e){if(e.target===this)fecharModalSheets();});
+// ══════ SYNC SUPABASE ══════
+
+async function syncGS(item){
+  // Mantém nome syncGS para compatibilidade com o restante do código
+  const lbl=document.getElementById('gs-label');
+  const payload={
+    func:item.func,
+    resp:item.resp,
+    vinculo:item.vinculo,
+    ativ:item.ativ,
+    camp:item.camp,
+    prazo:item.prazo||null,
+    entrega:item.entrega||null,
+    status:item.status,
+    prior:item.prior,
+    link:item.link,
+    obs:item.obs,
+    foto:getFoto(item.resp)||'',
+    empresa:_empresaFiltro||''
+  };
+  try{
+    if(lbl)lbl.textContent='⟳ Salvando...';
+    if(item.action==='delete'){
+      await sbDelete('entregaveis',item.id);
+    }else if(item._isNew){
+      const rows=await sbPost('entregaveis',payload);
+      // Atualiza id local com id real do banco
+      if(rows&&rows[0]){
+        const idx=dados.findIndex(d=>d.id===item.id);
+        if(idx>=0){dados[idx].id=rows[0].id;saveLocal();}
+      }
+    }else{
+      await sbPatch('entregaveis',item.id,payload);
+    }
+    if(lbl)lbl.textContent='✓ Salvo!';
+    setTimeout(()=>{if(lbl)lbl.textContent='Supabase conectado';},1500);
+  }catch(e){
+    console.warn('Sync Supabase falhou:',e);
+    if(lbl)lbl.textContent='Erro ao salvar';
+    setTimeout(()=>{if(lbl)lbl.textContent='Supabase conectado';},3000);
+  }
+}
+
+async function deletarGS(id){
+  try{await sbDelete('entregaveis',id);}
+  catch(e){console.warn('Erro ao deletar:',e);}
+}
+
+async function carregarDoSheets(){
+  // Mantém nome para compatibilidade
+  await _carregarDadosCliente();
+  const lbl=document.getElementById('gs-label');
+  if(lbl)lbl.textContent='Supabase conectado';
+}
+
+function abrirModalSheets(){
+  alert('O app agora usa Supabase. Configure SUPABASE_URL e SUPABASE_KEY no início do arquivo.');
+}
+function fecharModalSheets(){}
+function salvarGS(){}
+function desconectarGS(){}
+function atualizarBadgeGS(){
+  const btn=document.getElementById('gs-btn'),lbl=document.getElementById('gs-label');
+  if(btn)btn.classList.add('connected');
+  if(lbl)lbl.textContent='Supabase conectado';
+}
 document.getElementById('e-novo-comentario').addEventListener('keydown',function(e){if(e.key==='Enter')adicionarComentario();});
 document.getElementById('e-nova-tarefa').addEventListener('keydown',function(e){if(e.key==='Enter')adicionarTarefa();});
 document.getElementById('e-link').addEventListener('input',function(){const a=document.getElementById('e-link-open');if(this.value){a.href=this.value;a.style.display='block';}else{a.style.display='none';}});
@@ -1150,8 +1211,52 @@ document.getElementById('e-link').addEventListener('input',function(){const a=do
 populateFilterSelects();atualizarPeriodoLabel();
 
 
+// ══════ SUPABASE — helpers ══════
+
+function sbHeaders(){
+  return{
+    'Content-Type':'application/json',
+    'apikey':SUPABASE_KEY,
+    'Authorization':'Bearer '+SUPABASE_KEY
+  };
+}
+
+async function sbGet(table,params=''){
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}?${params}`,{headers:sbHeaders()});
+  if(!r.ok)throw new Error('Supabase GET '+table+': '+r.status);
+  return r.json();
+}
+
+async function sbPost(table,body){
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{...sbHeaders(),'Prefer':'return=representation'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok)throw new Error('Supabase POST '+table+': '+r.status);
+  return r.json();
+}
+
+async function sbPatch(table,id,body){
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{...sbHeaders(),'Prefer':'return=representation'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok)throw new Error('Supabase PATCH '+table+': '+r.status);
+  return r.json();
+}
+
+async function sbDelete(table,id){
+  const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'DELETE',
+    headers:sbHeaders()
+  });
+  if(!r.ok)throw new Error('Supabase DELETE '+table+': '+r.status);
+}
+
 // ══════ LOGIN / EMPRESA ══════
-const GS_CLIENTES='https://script.google.com/macros/s/AKfycbw-wpz-06HknXy32plcgmoQxnVRnteZib52VyV_vseOWLZ1Uxw-S_V9AdVqbDgP7WyL/exec';
+
 let _usuario=null;
 let _empresas=[];
 let _empresaFiltro='';
@@ -1163,29 +1268,25 @@ async function fazerLogin(){
   const btn=document.getElementById('btn-login');
   btn.innerHTML='<i class="ti ti-loader"></i> Entrando...';btn.disabled=true;
   try{
-    const resp=await fetch(GS_CLIENTES+'?acao=login&usuario='+encodeURIComponent(u)+'&senha='+encodeURIComponent(s)+'&nocache='+Date.now(),{cache:'no-store'});
-    const json=await resp.json();
-    if(json.ok){
-      _usuario=json;
+    // Busca usuário por login + senha
+    const rows=await sbGet('usuarios',`login=eq.${encodeURIComponent(u)}&senha=eq.${encodeURIComponent(s)}&select=*`);
+    if(rows&&rows.length>0){
+      _usuario={ok:true,...rows[0]};
       document.getElementById('login-page').style.display='none';
       document.getElementById('app-main').style.display='block';
       if(_usuario.perfil==='admin'){
         document.getElementById('empresa-bar').style.display='flex';
-        gsUrl=GS_CLIENTES;
-        localStorage.setItem('mkt_gs_url',gsUrl);
-        atualizarBadgeGS();
         await _carregarEmpresas();
       }else{
         document.getElementById('cliente-bar').style.display='flex';
-        document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa;
-        _empresaFiltro=_usuario.empresa;
-        // Esconder edição para cliente
+        document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa||'';
+        _empresaFiltro=_usuario.empresa||'';
         document.querySelectorAll('.nav-add').forEach(b=>b.style.display='none');
         document.getElementById('gs-btn').style.display='none';
-        gsUrl=GS_CLIENTES;
       }
       await _carregarDadosCliente();
       renderDashboard();
+      // Atualiza dados a cada 60s em tempo real
       setInterval(()=>_carregarDadosCliente(),60000);
     }else{
       document.getElementById('login-error').style.display='flex';
@@ -1194,54 +1295,47 @@ async function fazerLogin(){
   }catch(e){
     console.error(e);
     btn.innerHTML='<i class="ti ti-login"></i> Entrar';btn.disabled=false;
-    alert('Erro de conexão. Tente novamente.');
+    alert('Erro de conexão. Verifique as configurações do Supabase.');
   }
 }
 
 async function _carregarEmpresas(){
   try{
-    const resp=await fetch(GS_CLIENTES+'?acao=empresas&nocache='+Date.now(),{cache:'no-store'});
-    const _raw=await resp.json();
-    // Normaliza campos - Sheets pode retornar 'nome', 'name', ou posição
-    _empresas=_raw.map(e=>{
-      const nome=e.nome||e.name||e.Nome||Object.values(e).find(v=>v&&String(v).length>1&&isNaN(v))||'';
-      return {nome:String(nome).trim()};
-    }).filter(e=>e.nome);
+    const rows=await sbGet('empresas','select=id,nome&order=nome');
+    _empresas=rows||[];
     const opts=_empresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
     const sel=document.getElementById('empresa-select');
     if(sel)sel.innerHTML='<option value="">— Todas as empresas —</option>'+opts;
-  }catch(e){console.error(e);}
+  }catch(e){console.error('Erro ao carregar empresas:',e);}
 }
 
 async function _carregarDadosCliente(){
   try{
-    const url=GS_CLIENTES+'?nocache='+Date.now()+(_empresaFiltro?'&empresa='+encodeURIComponent(_empresaFiltro):'');
-    const resp=await fetch(url,{cache:'no-store'});
-    const json=await resp.json();
-    if(Array.isArray(json)){
-      dados=json.map(d=>{
-        return{
-          id:Number(d.ID||d.id||0),
-          func:String(d['Função']||d.func||''),
-          resp:String(d['Responsável']||d.resp||''),
-          vinculo:String(d['Vínculo']||d.vinculo||'fixo'),
-          ativ:String(d.Atividade||d.ativ||''),
-          camp:String(d.Campanha||d.camp||''),
-          prazo:parseDate(d.Prazo||d.prazo),
-          entrega:parseDate(d['Entrega Real']||d.entrega),
-          status:String(d.Status||d.status||'pendente').toLowerCase().trim(),
-          prior:String(d.Prioridade||d.prior||'normal').toLowerCase().trim(),
-          link:String(d.Link||d.link||''),
-          obs:String(d['Observações']||d.obs||''),
-          foto:String(d.Foto||d.foto||''),
-          empresa:String(d.Empresa||d.empresa||'')
-        };
-      });
+    let params='select=*&order=id';
+    if(_empresaFiltro)params+=`&empresa=eq.${encodeURIComponent(_empresaFiltro)}`;
+    const rows=await sbGet('entregaveis',params);
+    if(Array.isArray(rows)){
+      dados=rows.map(d=>({
+        id:Number(d.id||0),
+        func:String(d.func||''),
+        resp:String(d.resp||''),
+        vinculo:String(d.vinculo||'fixo'),
+        ativ:String(d.ativ||''),
+        camp:String(d.camp||''),
+        prazo:parseDate(d.prazo),
+        entrega:parseDate(d.entrega),
+        status:String(d.status||'pendente').toLowerCase().trim(),
+        prior:String(d.prior||'normal').toLowerCase().trim(),
+        link:String(d.link||''),
+        obs:String(d.obs||''),
+        foto:String(d.foto||''),
+        empresa:String(d.empresa||'')
+      }));
       nextId=dados.reduce((m,d)=>Math.max(m,Number(d.id)||0),0)+1;
       populateFilterSelects();
     }
     renderAtivo();
-  }catch(e){console.error('Erro:',e);}
+  }catch(e){console.error('Erro ao carregar dados:',e);}
 }
 
 async function trocarEmpresa(){
@@ -1250,7 +1344,7 @@ async function trocarEmpresa(){
 }
 
 function logout(){
-  _usuario=null;dados=[];_empresas=[];_empresaFiltro='';gsUrl='';
+  _usuario=null;dados=[];_empresas=[];_empresaFiltro='';
   document.getElementById('app-main').style.display='none';
   document.getElementById('login-page').style.display='flex';
   document.getElementById('empresa-bar').style.display='none';
@@ -1293,8 +1387,7 @@ async function admAddEmpresa(){
   const nome=document.getElementById('adm-empresa')?.value.trim();
   if(!nome){alert('Digite o nome da empresa');return;}
   try{
-    const r=await fetch(GS_CLIENTES+'?data='+encodeURIComponent(JSON.stringify({acao:'addEmpresa',nome})),{cache:'no-store'});
-    await r.text();
+    await sbPost('empresas',{nome});
     await _carregarEmpresas();
     document.getElementById('adm-empresa').value='';
     const sel=document.getElementById('adm-emp');
@@ -1309,16 +1402,18 @@ async function admAddUsuario(){
   const e=document.getElementById('adm-emp')?.value;
   if(!u||!s||!e){alert('Preencha todos os campos');return;}
   try{
-    const r=await fetch(GS_CLIENTES+'?data='+encodeURIComponent(JSON.stringify({acao:'addUsuario',usuario:u,senha:s,perfil:'cliente',empresa:e})),{cache:'no-store'});
-    await r.text();
+    await sbPost('usuarios',{login:u,senha:s,perfil:'cliente',empresa:e});
     document.getElementById('adm-user').value='';
     document.getElementById('adm-pass').value='';
     alert('Usuário "'+u+'" criado para '+e+'!');
   }catch(e){alert('Erro: '+e);}
 }
 
+document.getElementById('modal-edicao').addEventListener('click',function(e){if(e.target===this)fecharModalEdicao();});
 document.getElementById('l-senha').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin();});
 document.getElementById('l-usuario').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin();});
+// Marca badge como conectado ao Supabase na inicialização
+atualizarBadgeGS();
 
 </script>
 </div>
