@@ -1544,6 +1544,8 @@ async function admAbrirSecao(secao){
       <button onclick="limparLogs()" style="margin-left:auto;padding:6px 12px;font-size:12px;font-weight:600;border-radius:var(--r-sm);border:1.5px solid var(--danger-border);color:var(--danger);background:none;cursor:pointer"><i class="ti ti-trash"></i> Limpar logs</button>
     </div>
     <div id="log-lista" style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto"></div>`;
+
+  if(secao==='usuarios') conteudo=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
       <div class="fg"><label>Usuário</label><input id="adm-user" type="text"></div>
       <div class="fg"><label>Senha</label><input id="adm-pass" type="password"></div>
@@ -1551,8 +1553,8 @@ async function admAbrirSecao(secao){
     <div class="fg" style="margin-bottom:12px"><label>Empresa</label>
       <select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select>
     </div>
-    <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;margin-bottom:14px"><i class="ti ti-user-plus"></i> Criar usuário cliente</button>
-    <select id="adm-busca-usuario" onchange="admFiltrarUsuarios()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)"><option value="">— Ver todos os usuários —</option></select>
+    <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;margin-bottom:14px"><i class="ti ti-lock"></i> Criar acesso para empresa</button>
+    <select id="adm-busca-usuario" onchange="admFiltrarUsuarios()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)"><option value="">— Ver acessos cadastrados —</option></select>
     <div id="adm-lista-usuarios" style="display:flex;flex-direction:column;gap:6px"></div>`;
 
   div.innerHTML=`<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(43,63,212,.2)">
