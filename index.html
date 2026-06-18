@@ -331,7 +331,7 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
   <select id="empresa-select" onchange="trocarEmpresa()" style="font-size:12px;padding:6px 10px;border-radius:var(--r-sm);border:1px solid var(--border2);background:#fff;color:var(--text);font-family:'Inter',sans-serif;min-width:200px">
     <option value="">— Todas as empresas —</option>
   </select>
-  <button onclick="abrirModalAdmin()" style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-settings"></i> Gerenciar</button>
+  <button id="btn-gerenciar" onclick="abrirModalAdmin()" style="padding:6px 14px;font-size:12px;font-weight:600;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-settings"></i> Gerenciar</button>
   <button onclick="logout()" style="margin-left:auto;padding:6px 14px;font-size:12px;font-weight:600;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:#fff;color:var(--danger);cursor:pointer;display:inline-flex;align-items:center;gap:5px"><i class="ti ti-logout"></i> Sair</button>
 </div>
 <!-- CLIENTE BAR -->
@@ -456,18 +456,9 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
     <h2><i class="ti ti-clipboard-plus" style="font-size:18px;vertical-align:-2px;margin-right:6px"></i>Adicionar entregável</h2>
     <div id="toast" class="toast"><i class="ti ti-circle-check"></i> Entregável salvo!</div>
     <div class="form-grid">
-      <div class="fg"><label>Função *</label><select id="f-func"><option value="">Selecione...</option><option>Fotógrafo</option><option>Design</option><option>Social Media</option><option>Videomaker</option><option>Tráfego Pago</option><option>Copywriter</option></select></div>
-      <div class="fg"><label>Responsável *</label><input id="f-resp" type="text" placeholder="Nome"></div>
-      <div class="fg"><label>Foto do responsável</label>
-        <div style="display:flex;align-items:center;gap:10px">
-          <div id="f-foto-preview" style="width:40px;height:40px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--blue);flex-shrink:0;overflow:hidden;border:2px solid var(--border2)"><i class="ti ti-user" style="font-size:16px"></i></div>
-          <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-size:12px;font-weight:600;color:var(--text2);background:var(--white);transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
-            <i class="ti ti-upload" style="font-size:14px"></i> Escolher foto
-            <input type="file" accept="image/*" style="display:none" onchange="fotoUpload(this,'f-foto','f-foto-preview')">
-          </label>
-          <input type="hidden" id="f-foto">
-        </div>
-      </div>
+      <div class="fg"><label>Função *</label><select id="f-func" onchange="atualizarMembrosPorFuncao('f-func','f-resp')"><option value="">Selecione...</option></select></div>
+      <div class="fg"><label>Responsável *</label><select id="f-resp"><option value="">Selecione a função primeiro...</option></select></div>
+      <input type="hidden" id="f-foto">
       <div class="fg"><label>Vínculo</label><select id="f-vinculo"><option value="fixo">Fixo</option><option value="freelancer">Freelancer</option></select></div>
       <div class="fg"><label>Campanha</label><input id="f-camp" type="text" placeholder="Ex: Aurora"></div>
       <div class="fg full"><label>Atividade / Entregável *</label><input id="f-ativ" type="text" placeholder="Descreva o que deve ser entregue"></div>
@@ -502,8 +493,8 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
       <div class="modal-tab-content active" id="mtab-detalhes">
         <div class="fg full" style="margin-bottom:12px"><label>Entregável</label><input id="e-ativ" type="text"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-          <div class="fg"><label>Função</label><select id="e-func"><option>Fotógrafo</option><option>Design</option><option>Social Media</option><option>Videomaker</option><option>Tráfego Pago</option><option>Copywriter</option></select></div>
-          <div class="fg"><label>Responsável</label><input id="e-resp" type="text"></div>
+          <div class="fg"><label>Função</label><select id="e-func" onchange="atualizarMembrosPorFuncao('e-func','e-resp')"><option value="">Selecione...</option></select></div>
+          <div class="fg"><label>Responsável</label><select id="e-resp"><option value="">Selecione...</option></select></div>
           <div class="fg"><label>Foto do responsável</label>
             <div style="display:flex;align-items:center;gap:10px">
               <div id="e-foto-preview" style="width:40px;height:40px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--blue);flex-shrink:0;overflow:hidden;border:2px solid var(--border2)"><i class="ti ti-user" style="font-size:16px"></i></div>
@@ -582,6 +573,34 @@ function reconstruirFP(){
   FUNCS.forEach((f,i)=>{FP[f]=FP_CORES[i%FP_CORES.length];});
 }
 
+let _equipe=[];
+
+async function carregarEquipe(){
+  try{
+    const rows=await sbGet('equipe','select=*&order=nome');
+    _equipe=rows||[];
+  }catch(e){_equipe=[];}
+}
+
+function atualizarMembrosPorFuncao(funcSelId, respSelId){
+  const func=document.getElementById(funcSelId)?.value||'';
+  const sel=document.getElementById(respSelId);
+  if(!sel)return;
+  const membros=func?_equipe.filter(m=>m.func===func):_equipe;
+  if(membros.length===0){
+    sel.innerHTML='<option value="">Nenhum membro cadastrado para esta função</option>';
+  }else{
+    sel.innerHTML='<option value="">Selecione...</option>'+membros.map(m=>`<option value="${m.nome}">${m.nome}</option>`).join('');
+  }
+  // Preenche vínculo automaticamente
+  sel.onchange=function(){
+    const membro=_equipe.find(m=>m.nome===this.value);
+    const vinculoId=respSelId==='f-resp'?'f-vinculo':'e-vinculo';
+    const vinculoEl=document.getElementById(vinculoId);
+    if(vinculoEl&&membro)vinculoEl.value=membro.vinculo||'fixo';
+  };
+}
+
 async function carregarFuncoes(){
   try{
     const rows=await sbGet('funcoes','select=*&order=nome');
@@ -591,7 +610,6 @@ async function carregarFuncoes(){
       atualizarSelectsFuncao();
     }
   }catch(e){
-    // Tabela ainda não existe — usa padrão
     reconstruirFP();
     atualizarSelectsFuncao();
   }
@@ -723,7 +741,7 @@ function limparFiltros(){
   atualizarPeriodoLabel();renderAtivo();
 }
 function populateFilterSelects(){const camps=[...new Set(dados.map(d=>d.camp).filter(Boolean))].sort();const profs=[...new Set(dados.map(d=>d.resp).filter(Boolean))].sort();const fc=document.getElementById('f-campanha');const fe=document.getElementById('f-equipe');const cv=fc.value,ev=fe.value;fc.innerHTML='<option value="">Todas as campanhas</option>'+camps.map(c=>`<option value="${c}">${c}</option>`).join('');fe.innerHTML='<option value="">Toda a equipe</option>'+profs.map(p=>`<option value="${p}">${p}</option>`).join('');fc.value=cv;fe.value=ev;}
-function goTab(id,el){document.querySelectorAll('.page,.page-full').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');if(el)el.classList.add('active');if(id==='dashboard')renderDashboard();else if(id==='lista')renderLista();else if(id==='kanban')renderKanban();else if(id==='equipe')renderEquipe();else if(id==='relatorio')gerarRelatorio();}
+function goTab(id,el){document.querySelectorAll('.page,.page-full').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');if(el)el.classList.add('active');if(id==='dashboard')renderDashboard();else if(id==='lista')renderLista();else if(id==='kanban')renderKanban();else if(id==='equipe')renderEquipe();else if(id==='relatorio')gerarRelatorio();else if(id==='cadastro'){atualizarSelectsFuncao();atualizarMembrosPorFuncao('f-func','f-resp');}}
 function renderAtivo(){const aba=document.querySelector('.page.active,.page-full.active');if(!aba)return;const id=aba.id.replace('page-','');if(id==='dashboard')renderDashboard();else if(id==='lista')renderLista();else if(id==='kanban')renderKanban();else if(id==='relatorio')gerarRelatorio();else if(id==='equipe'){const perf=document.getElementById('equipe-perfil');if(perf.style.display!=='none'){const nm=perf.querySelector('.perfil-name')?.textContent;if(nm)abrirPerfil(nm);else renderEquipe();}else renderEquipe();}}
 function comprimirFoto(file,cb){
   const reader=new FileReader();
@@ -1075,11 +1093,13 @@ function adicionarHistorico(id,msg){if(!historico[id])historico[id]=[];historico
 function renderHistorico(id){const lista=historico[id]||[];const el=document.getElementById('e-historico');el.innerHTML=lista.length?lista.map(h=>`<div class="historico-item"><div class="historico-icon"><i class="ti ti-history"></i></div><span style="flex:1">${h.msg}</span><span class="historico-time">${h.data}</span></div>`).join(''):'<p style="font-size:12px;color:var(--text3);text-align:center;padding:1rem">Nenhuma atividade.</p>';}
 function limpar(){['f-func','f-resp','f-foto','f-vinculo','f-ativ','f-prazo','f-entrega','f-status','f-camp','f-prior','f-link','f-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.tagName==='SELECT'?el.selectedIndex=0:el.value='';});}
 function salvar(){
-  const func=document.getElementById('f-func').value,resp=document.getElementById('f-resp').value.trim(),ativ=document.getElementById('f-ativ').value.trim(),prazo=document.getElementById('f-prazo').value,status=document.getElementById('f-status').value;
+  const func=document.getElementById('f-func').value,resp=document.getElementById('f-resp').value,ativ=document.getElementById('f-ativ').value.trim(),prazo=document.getElementById('f-prazo').value,status=document.getElementById('f-status').value;
   if(!func||!resp||!ativ||!prazo||!status){alert('Preencha os campos obrigatórios (*)');return;}
-  const novo={id:nextId++,func,resp,foto:document.getElementById('f-foto').value.trim(),vinculo:document.getElementById('f-vinculo').value,ativ,prazo,entrega:document.getElementById('f-entrega').value,status,camp:document.getElementById('f-camp').value.trim(),prior:document.getElementById('f-prior').value,link:document.getElementById('f-link').value.trim(),obs:document.getElementById('f-obs').value.trim(),criadoEm:agora(),_isNew:true};
-  const fotoVal=document.getElementById('f-foto').value.trim();
-  if(fotoVal&&novo.resp){fotosEquipe[novo.resp]=fotoVal;saveFotos();}
+  const membro=_equipe.find(m=>m.nome===resp);
+  const foto=membro?.foto||getFoto(resp)||'';
+  const vinculo=membro?.vinculo||document.getElementById('f-vinculo').value||'fixo';
+  const novo={id:nextId++,func,resp,foto,vinculo,ativ,prazo,entrega:document.getElementById('f-entrega').value,status,camp:document.getElementById('f-camp').value.trim(),prior:document.getElementById('f-prior').value,link:document.getElementById('f-link').value.trim(),obs:document.getElementById('f-obs').value.trim(),criadoEm:agora(),_isNew:true};
+  if(foto&&resp){fotosEquipe[resp]=foto;saveFotos();}
   dados.push(novo);adicionarHistorico(novo.id,'Entregável criado');saveLocal();populateFilterSelects();syncGS(novo);limpar();
   const t=document.getElementById('toast');t.style.display='flex';setTimeout(()=>t.style.display='none',2500);
   goTab('dashboard',document.querySelector('.nav-tab'));
@@ -1314,6 +1334,7 @@ async function fazerLogin(){
     const rows=await sbGet('usuarios',`login=eq.${encodeURIComponent(u)}&senha=eq.${encodeURIComponent(s)}&select=*`);
     if(rows&&rows.length>0){
       _usuario={ok:true,...rows[0]};
+      localStorage.setItem('mkt_sessao',JSON.stringify(_usuario));
       document.getElementById('login-page').style.display='none';
       document.getElementById('app-main').style.display='block';
       if(_usuario.perfil==='admin'){
@@ -1323,11 +1344,12 @@ async function fazerLogin(){
         document.getElementById('cliente-bar').style.display='flex';
         document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa||'';
         _empresaFiltro=_usuario.empresa||'';
-        document.querySelectorAll('.nav-add').forEach(b=>b.style.display='none');
+        // Cliente pode cadastrar entregáveis, mas não gerenciar
         document.getElementById('gs-btn').style.display='none';
       }
       await _carregarDadosCliente();
       await carregarFuncoes();
+      await carregarEquipe();
       renderDashboard();
       // Atualiza dados a cada 60s em tempo real
       setInterval(()=>_carregarDadosCliente(),60000);
@@ -1388,6 +1410,7 @@ async function trocarEmpresa(){
 
 function logout(){
   _usuario=null;dados=[];_empresas=[];_empresaFiltro='';
+  localStorage.removeItem('mkt_sessao');
   document.getElementById('app-main').style.display='none';
   document.getElementById('login-page').style.display='flex';
   document.getElementById('empresa-bar').style.display='none';
@@ -1403,69 +1426,171 @@ async function abrirModalAdmin(){
   div.id='modal-admin-bg';
   div.style.cssText='position:fixed;inset:0;background:rgba(18,19,42,.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)';
   div.onclick=e=>{if(e.target===div)div.remove();};
-  div.innerHTML=`<div style="background:#fff;border-radius:12px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(43,63,212,.2)">
-    <div style="padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);background:linear-gradient(135deg,var(--blue-light),#fff);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;border-radius:12px 12px 0 0">
-      <h2 style="font-size:15px;font-weight:700;color:var(--blue)"><i class="ti ti-settings" style="margin-right:6px"></i>Administração</h2>
-      <button onclick="document.getElementById('modal-admin-bg').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#9090b0">✕</button>
+  div.innerHTML=`<div style="background:#fff;border-radius:16px;width:100%;max-width:480px;box-shadow:0 12px 40px rgba(43,63,212,.2);overflow:hidden">
+    <div style="padding:1.25rem 1.5rem;background:linear-gradient(135deg,var(--blue),var(--blue-dark));display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <h2 style="font-size:16px;font-weight:700;color:#fff"><i class="ti ti-settings" style="margin-right:8px"></i>Administração</h2>
+        <p style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px">Selecione o que deseja gerenciar</p>
+      </div>
+      <button onclick="document.getElementById('modal-admin-bg').remove()" style="background:rgba(255,255,255,.15);border:none;cursor:pointer;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px">✕</button>
     </div>
-    <div style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:20px">
-
-      <!-- EMPRESAS -->
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-building" style="color:var(--blue)"></i> Empresas</div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="adm-empresa" type="text" placeholder="Nome da empresa" style="flex:1;font-size:13px;padding:9px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif">
-          <button onclick="admAddEmpresa()" style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;white-space:nowrap"><i class="ti ti-plus"></i> Adicionar</button>
-        </div>
-        <select id="adm-busca-empresa" onchange="admFiltrarEmpresas()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)">
-          <option value="">— Ver todas as empresas —</option>
-        </select>
-        <div id="adm-lista-empresas" style="display:flex;flex-direction:column;gap:6px"></div>
-      </div>
-
-      <div style="height:1px;background:var(--border)"></div>
-
-      <!-- FUNÇÕES DA EQUIPE -->
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-briefcase" style="color:var(--blue)"></i> Funções da equipe</div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="adm-funcao" type="text" placeholder="Ex: Gestor de Tráfego" style="flex:1;font-size:13px;padding:9px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif">
-          <button onclick="admAddFuncao()" style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;white-space:nowrap"><i class="ti ti-plus"></i> Adicionar</button>
-        </div>
-        <select id="adm-busca-funcao" onchange="admFiltrarFuncoes()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)">
-          <option value="">— Ver todas as funções —</option>
-        </select>
-        <div id="adm-lista-funcoes" style="display:flex;flex-direction:column;gap:6px"></div>
-      </div>
-
-      <div style="height:1px;background:var(--border)"></div>
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-user-plus" style="color:var(--blue)"></i> Novo usuário cliente</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div class="fg"><label>Usuário</label><input id="adm-user" type="text"></div>
-          <div class="fg"><label>Senha</label><input id="adm-pass" type="password"></div>
-        </div>
-        <div class="fg" style="margin-bottom:12px"><label>Empresa</label>
-          <select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select>
-        </div>
-        <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer"><i class="ti ti-user-plus"></i> Criar usuário cliente</button>
-      </div>
-
-      <div style="height:1px;background:var(--border)"></div>
-
-      <!-- LISTA USUÁRIOS -->
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="ti ti-users" style="color:var(--blue)"></i> Usuários cadastrados</div>
-        <select id="adm-busca-usuario" onchange="admFiltrarUsuarios()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)">
-          <option value="">— Ver todos os usuários —</option>
-        </select>
-        <div id="adm-lista-usuarios" style="display:flex;flex-direction:column;gap:6px"></div>
-      </div>
-
+    <div style="padding:1.25rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <button onclick="admAbrirSecao('empresas')" style="background:var(--white);border:1.5px solid var(--border2);border-radius:12px;padding:1.25rem 1rem;cursor:pointer;text-align:left;transition:all .15s;display:flex;flex-direction:column;gap:8px" onmouseover="this.style.borderColor='var(--blue)';this.style.background='var(--blue-light)'" onmouseout="this.style.borderColor='var(--border2)';this.style.background='var(--white)'">
+        <div style="width:40px;height:40px;border-radius:10px;background:var(--blue-light);display:flex;align-items:center;justify-content:center"><i class="ti ti-building" style="font-size:20px;color:var(--blue)"></i></div>
+        <div><div style="font-size:13px;font-weight:700;color:var(--text)">Empresas</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Cadastrar e gerenciar</div></div>
+      </button>
+      <button onclick="admAbrirSecao('funcoes')" style="background:var(--white);border:1.5px solid var(--border2);border-radius:12px;padding:1.25rem 1rem;cursor:pointer;text-align:left;transition:all .15s;display:flex;flex-direction:column;gap:8px" onmouseover="this.style.borderColor='var(--blue)';this.style.background='var(--blue-light)'" onmouseout="this.style.borderColor='var(--border2)';this.style.background='var(--white)'">
+        <div style="width:40px;height:40px;border-radius:10px;background:#fdf3d7;display:flex;align-items:center;justify-content:center"><i class="ti ti-briefcase" style="font-size:20px;color:var(--gold-dark)"></i></div>
+        <div><div style="font-size:13px;font-weight:700;color:var(--text)">Funções</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Tipos de serviço</div></div>
+      </button>
+      <button onclick="admAbrirSecao('equipe')" style="background:var(--white);border:1.5px solid var(--border2);border-radius:12px;padding:1.25rem 1rem;cursor:pointer;text-align:left;transition:all .15s;display:flex;flex-direction:column;gap:8px" onmouseover="this.style.borderColor='var(--blue)';this.style.background='var(--blue-light)'" onmouseout="this.style.borderColor='var(--border2)';this.style.background='var(--white)'">
+        <div style="width:40px;height:40px;border-radius:10px;background:var(--ok-bg);display:flex;align-items:center;justify-content:center"><i class="ti ti-id-badge" style="font-size:20px;color:var(--ok)"></i></div>
+        <div><div style="font-size:13px;font-weight:700;color:var(--text)">Equipe</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Membros e freelancers</div></div>
+      </button>
     </div>
   </div>`;
   document.body.appendChild(div);
+}
+
+async function admAbrirSecao(secao){
+  document.getElementById('modal-admin-bg')?.remove();
+  const configs={
+    empresas:{titulo:'Empresas',icone:'ti-building',cor:'var(--blue)',corBg:'var(--blue-light)'},
+    funcoes:{titulo:'Funções da Equipe',icone:'ti-briefcase',cor:'var(--gold-dark)',corBg:'#fdf3d7'},
+    equipe:{titulo:'Membros da Equipe',icone:'ti-id-badge',cor:'var(--ok)',corBg:'var(--ok-bg)'},
+    usuarios:{titulo:'Acesso por Empresa',icone:'ti-lock',cor:'var(--info)',corBg:'var(--info-bg)'},
+  };
+  const cfg=configs[secao];
+  const div=document.createElement('div');
+  div.id='modal-secao-bg';
+  div.style.cssText='position:fixed;inset:0;background:rgba(18,19,42,.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)';
+  div.onclick=e=>{if(e.target===div)div.remove();};
+
+  let conteudo='';
+  if(secao==='empresas') conteudo=`
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input id="adm-empresa" type="text" placeholder="Nome da empresa" style="flex:1;font-size:13px;padding:9px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif">
+      <button onclick="admAddEmpresa()" style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;white-space:nowrap"><i class="ti ti-plus"></i> Adicionar</button>
+    </div>
+    <select id="adm-busca-empresa" onchange="admFiltrarEmpresas()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:16px;width:100%;background:var(--white)"><option value="">— Ver todas as empresas —</option></select>
+    <div id="adm-lista-empresas" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px"></div>
+    <div style="height:1px;background:var(--border);margin-bottom:16px"></div>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="ti ti-lock" style="color:var(--blue)"></i> Login de acesso por empresa</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="fg"><label>Usuário</label><input id="adm-user" type="text"></div>
+      <div class="fg"><label>Senha</label><input id="adm-pass" type="password"></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Empresa</label>
+      <select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select>
+    </div>
+    <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;margin-bottom:14px"><i class="ti ti-lock"></i> Criar acesso para empresa</button>
+    <select id="adm-busca-usuario" onchange="admFiltrarUsuarios()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)"><option value="">— Ver acessos cadastrados —</option></select>
+    <div id="adm-lista-usuarios" style="display:flex;flex-direction:column;gap:6px"></div>`;
+
+  if(secao==='funcoes') conteudo=`
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input id="adm-funcao" type="text" placeholder="Ex: Gestor de Tráfego" style="flex:1;font-size:13px;padding:9px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif">
+      <button onclick="admAddFuncao()" style="padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;white-space:nowrap"><i class="ti ti-plus"></i> Adicionar</button>
+    </div>
+    <select id="adm-busca-funcao" onchange="admFiltrarFuncoes()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)"><option value="">— Ver todas as funções —</option></select>
+    <div id="adm-lista-funcoes" style="display:flex;flex-direction:column;gap:6px"></div>`;
+
+  if(secao==='equipe') conteudo=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="fg"><label>Nome</label><input id="adm-eq-nome" type="text" placeholder="Nome completo"></div>
+      <div class="fg"><label>Função</label><select id="adm-eq-func" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select></div>
+      <div class="fg"><label>Vínculo</label><select id="adm-eq-vinculo" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"><option value="fixo">Fixo</option><option value="freelancer">Freelancer</option></select></div>
+      <div class="fg"><label>Foto</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div id="adm-eq-foto-preview" style="width:36px;height:36px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;border:2px solid var(--border2)"><i class="ti ti-user" style="font-size:14px;color:var(--blue)"></i></div>
+          <label style="cursor:pointer;font-size:12px;font-weight:600;padding:6px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);color:var(--text2);background:var(--white)"><i class="ti ti-upload" style="font-size:12px"></i> Foto<input type="file" accept="image/*" style="display:none" onchange="admEqFotoUpload(this)"></label>
+          <input type="hidden" id="adm-eq-foto">
+        </div>
+      </div>
+    </div>
+    <button onclick="admAddMembro()" style="width:100%;padding:10px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;margin-bottom:12px"><i class="ti ti-user-plus"></i> Adicionar membro</button>
+    <select id="adm-busca-membro" onchange="admFiltrarMembros()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)"><option value="">— Ver todos os membros —</option></select>
+    <div id="adm-lista-membros" style="display:flex;flex-direction:column;gap:6px"></div>`;
+
+  if(secao==='usuarios') conteudo=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="fg"><label>Usuário</label><input id="adm-user" type="text"></div>
+      <div class="fg"><label>Senha</label><input id="adm-pass" type="password"></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Empresa</label>
+      <select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select>
+    </div>
+    <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;margin-bottom:14px"><i class="ti ti-user-plus"></i> Criar usuário cliente</button>
+    <select id="adm-busca-usuario" onchange="admFiltrarUsuarios()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)"><option value="">— Ver todos os usuários —</option></select>
+    <div id="adm-lista-usuarios" style="display:flex;flex-direction:column;gap:6px"></div>`;
+
+  div.innerHTML=`<div style="background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(43,63,212,.2)">
+    <div style="padding:1rem 1.25rem;background:linear-gradient(135deg,var(--blue),var(--blue-dark));display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:1;border-radius:16px 16px 0 0">
+      <button onclick="document.getElementById('modal-secao-bg').remove();abrirModalAdmin()" style="background:rgba(255,255,255,.15);border:none;cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0"><i class="ti ti-arrow-left"></i></button>
+      <div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${cfg.icone}" style="color:#fff;font-size:16px"></i></div>
+      <h2 style="font-size:15px;font-weight:700;color:#fff;flex:1">${cfg.titulo}</h2>
+      <button onclick="document.getElementById('modal-secao-bg').remove()" style="background:rgba(255,255,255,.15);border:none;cursor:pointer;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px">✕</button>
+    </div>
+    <div style="padding:1.25rem 1.5rem">${conteudo}</div>
+  </div>`;
+  document.body.appendChild(div);
   await admCarregarListas();
+}
+
+let _admMembros=[];
+
+function admEqFotoUpload(input){
+  const file=input.files[0];if(!file)return;
+  comprimirFoto(file,function(base64){
+    document.getElementById('adm-eq-foto').value=base64;
+    const prev=document.getElementById('adm-eq-foto-preview');
+    prev.innerHTML=`<img src="${base64}" style="width:100%;height:100%;object-fit:cover">`;
+  });
+}
+
+function admFiltrarMembros(){
+  const q=document.getElementById('adm-busca-membro')?.value||'';
+  const lista=document.getElementById('adm-lista-membros');
+  if(!lista)return;
+  if(!q){lista.innerHTML='';return;}
+  const filtrados=_admMembros.filter(m=>m.nome===q);
+  lista.innerHTML=filtrados.map(m=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm)">
+      ${m.foto?`<img src="${m.foto}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">`:
+        `<div style="width:36px;height:36px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;color:var(--blue)">${(m.nome||'?')[0].toUpperCase()}</div>`}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${m.nome}</div>
+        <div style="font-size:11px;color:var(--text3)">${m.func||'—'} · <span style="font-weight:600;color:${m.vinculo==='freelancer'?'var(--gold-dark)':'var(--text2)'}">${m.vinculo==='freelancer'?'Freelancer':'Fixo'}</span></div>
+      </div>
+      <button onclick="admExcluirMembro(${m.id},'${m.nome.replace(/'/g,"\\'")}')" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:12px;padding:3px 6px;border-radius:4px"><i class="ti ti-trash"></i></button>
+    </div>`).join('');
+}
+
+async function admAddMembro(){
+  const nome=document.getElementById('adm-eq-nome')?.value.trim();
+  const func=document.getElementById('adm-eq-func')?.value;
+  const vinculo=document.getElementById('adm-eq-vinculo')?.value||'fixo';
+  const foto=document.getElementById('adm-eq-foto')?.value||'';
+  if(!nome||!func){alert('Preencha nome e função');return;}
+  if(_equipe.find(m=>m.nome===nome)){alert('Já existe um membro com esse nome!');return;}
+  try{
+    await sbPost('equipe',{nome,func,vinculo,foto});
+    document.getElementById('adm-eq-nome').value='';
+    document.getElementById('adm-eq-foto').value='';
+    document.getElementById('adm-eq-foto-preview').innerHTML='<i class="ti ti-user" style="font-size:14px;color:var(--blue)"></i>';
+    await carregarEquipe();
+    await admCarregarListas();
+    alert(`Membro "${nome}" adicionado!`);
+  }catch(e){alert('Erro: '+e);}
+}
+
+async function admExcluirMembro(id,nome){
+  if(!confirm(`Excluir o membro "${nome}"?`))return;
+  try{
+    await sbDelete('equipe',id);
+    await carregarEquipe();
+    await admCarregarListas();
+  }catch(e){alert('Erro ao excluir: '+e);}
 }
 
 let _admFuncoes=[];
@@ -1549,7 +1674,15 @@ async function admCarregarListas(){
   try{_admFuncoes=await sbGet('funcoes','select=*&order=nome');}catch(e){_admFuncoes=[];}
   const selF=document.getElementById('adm-busca-funcao');
   if(selF)selF.innerHTML='<option value="">— Ver todas as funções —</option>'+_admFuncoes.map(f=>`<option value="${f.nome}">${f.nome}</option>`).join('');
+  // Popula select de funções do formulário de membro
+  const selEqFunc=document.getElementById('adm-eq-func');
+  if(selEqFunc)selEqFunc.innerHTML='<option value="">Selecione...</option>'+_admFuncoes.map(f=>`<option value="${f.nome}">${f.nome}</option>`).join('');
   admFiltrarFuncoes();
+  // Membros
+  _admMembros=_equipe.length?_equipe:[];
+  const selM=document.getElementById('adm-busca-membro');
+  if(selM)selM.innerHTML='<option value="">— Ver todos os membros —</option>'+_admMembros.map(m=>`<option value="${m.nome}">${m.nome} (${m.func||'—'})</option>`).join('');
+  admFiltrarMembros();
   // Empresas
   _admEmpresas=await sbGet('empresas','select=*&order=nome');
   if(selEmp)selEmp.innerHTML=_admEmpresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
@@ -1643,8 +1776,36 @@ async function admExcluirUsuario(id,login){
 document.getElementById('modal-edicao').addEventListener('click',function(e){if(e.target===this)fecharModalEdicao();});
 document.getElementById('l-senha').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin();});
 document.getElementById('l-usuario').addEventListener('keydown',e=>{if(e.key==='Enter')fazerLogin();});
-// Marca badge como conectado ao Supabase na inicialização
 atualizarBadgeGS();
+
+// Restaurar sessão ao recarregar a página
+(async function restaurarSessao(){
+  const sessao=localStorage.getItem('mkt_sessao');
+  if(!sessao)return;
+  try{_usuario=JSON.parse(sessao);}catch(e){localStorage.removeItem('mkt_sessao');return;}
+  // Mostra app imediatamente sem esperar o banco
+  document.getElementById('login-page').style.display='none';
+  document.getElementById('app-main').style.display='block';
+  if(_usuario.perfil==='admin'){
+    document.getElementById('empresa-bar').style.display='flex';
+  }else{
+    document.getElementById('cliente-bar').style.display='flex';
+    document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa||'';
+    _empresaFiltro=_usuario.empresa||'';
+    document.getElementById('gs-btn').style.display='none';
+  }
+  // Carrega dados em background — se falhar, mantém a sessão
+  try{
+    if(_usuario.perfil==='admin') await _carregarEmpresas();
+    await _carregarDadosCliente();
+    await carregarFuncoes();
+    await carregarEquipe();
+    renderDashboard();
+    setInterval(()=>_carregarDadosCliente(),60000);
+  }catch(e){
+    console.warn('Erro ao recarregar dados, mantendo sessão:', e);
+  }
+})();
 
 </script>
 </div>
