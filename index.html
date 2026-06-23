@@ -2061,10 +2061,12 @@ function admFiltrarUsuarios(){
 
 async function admCarregarListas(){
   const selEmp=document.getElementById('adm-emp');
+  // Sempre busca funções do banco primeiro
+  try{_admFuncoes=await sbGet('funcoes','select=*&order=nome');}catch(e){_admFuncoes=[];}
+  if(!_admFuncoes.length) _admFuncoes=FUNCS.map((n,i)=>({id:i,nome:n}));
   // Logs
   if(document.getElementById('log-lista')){
     await renderLogs();
-    // Popular filtro de usuários
     const selU=document.getElementById('log-filtro-usuario');
     if(selU&&_admUsuarios.length){
       selU.innerHTML='<option value="">— Todos os usuários —</option>'+_admUsuarios.map(u=>`<option value="${u.login}">${u.login}</option>`).join('');
