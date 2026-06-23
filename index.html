@@ -273,37 +273,46 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
 @media(max-width:640px){
   .form-grid{grid-template-columns:1fr}
   .fg.full{grid-column:1}
-  .kpi-grid{grid-template-columns:repeat(2,1fr)}
   /* Header mobile */
-  .header{padding:0 .75rem;gap:8px}
-  .logo-text{display:none}
+  .header{padding:0 .75rem;gap:8px;height:52px}
+  .header-brand{font-size:14px}
+  .header-meta{display:none}
+  .header-right{gap:6px}
+  /* Badge Supabase menor */
+  #gs-btn{font-size:10px!important;padding:4px 8px!important}
   /* Nav mobile — scroll horizontal */
-  .nav{padding:0 .5rem;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .nav{padding:0 .5rem;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:0}
   .nav::-webkit-scrollbar{display:none}
-  .nav-tab{font-size:11px;padding:8px 10px;white-space:nowrap;flex-shrink:0}
-  .nav-add{font-size:11px;padding:8px 10px;white-space:nowrap;flex-shrink:0}
+  .nav-tab{font-size:11px;padding:10px 10px;white-space:nowrap;flex-shrink:0}
+  .nav-add{font-size:11px;padding:8px 10px;white-space:nowrap;flex-shrink:0;margin-left:4px}
   /* Page padding mobile */
   .page{padding:.75rem}
-  /* Empresa bar mobile */
+  /* Empresa e cliente bar */
   .empresa-bar{padding:.5rem .75rem;gap:6px;flex-wrap:wrap}
-  .cliente-bar{padding:.5rem .75rem}
-  /* Filter bar mobile */
+  .empresa-bar select{font-size:12px;padding:6px 8px;flex:1;min-width:0}
+  /* Filter bar */
   .filter-bar{padding:.5rem .75rem;gap:6px;flex-wrap:wrap}
-  .filter-bar select{font-size:12px;padding:6px 8px}
-  /* KPI cards mobile — 2 colunas */
+  .filter-bar select,.filter-bar button{font-size:12px;padding:6px 8px}
+  /* KPI cards — 2 colunas compactas */
   .kpi-grid{grid-template-columns:repeat(2,1fr);gap:8px}
   .kpi-card{padding:.75rem}
-  .kpi-val{font-size:28px}
-  /* Dashboard charts mobile — coluna única */
+  .kpi-value{font-size:26px}
+  /* Dashboard charts — coluna única */
   .dash-charts{grid-template-columns:1fr!important}
-  /* Período buttons mobile */
-  .period-bar{gap:4px}
-  .period-bar button{font-size:11px;padding:5px 8px}
-  /* Modal mobile */
-  .modal{max-height:95vh;border-radius:12px 12px 0 0;position:fixed;bottom:0;left:0;right:0;width:100%;margin:0}
-  .modal-bg{align-items:flex-end}
+  /* Toolbar */
+  .toolbar{gap:6px}
+  .toolbar select,.toolbar input{font-size:12px;padding:6px 8px}
+  .toolbar input{min-width:120px}
+  /* Tabela */
+  table{font-size:12px}
+  tbody td{padding:8px 10px}
   /* Kanban mobile */
-  .kanban-board{grid-template-columns:1fr!important;gap:12px}
+  .kanban-board{grid-template-columns:1fr!important;gap:10px}
+  /* Section cards */
+  .section-card{padding:.85rem 1rem}
+  /* Modal mobile — sobe de baixo */
+  .modal-bg{align-items:flex-end;padding:0}
+  .modal{max-height:92vh;border-radius:16px 16px 0 0;width:100%;max-width:100%}
 }
 @media print{.nav,.header,.filter-bar,.btn,.toolbar{display:none!important}.page{display:block!important;padding:.5rem}body{background:#fff}}
 
@@ -1414,6 +1423,7 @@ async function fazerLogin(){
         _empresaFiltro=_usuario.empresa||'';
         // Cliente pode cadastrar entregáveis, mas não gerenciar
         document.getElementById('gs-btn').style.display='none';
+        document.getElementById('tab-resultados').style.display='none';
       }
       await _carregarDadosCliente();
       await carregarFuncoes();
@@ -2222,6 +2232,7 @@ solicitarPermissaoNotificacao();
     document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa||'';
     _empresaFiltro=_usuario.empresa||'';
     document.getElementById('gs-btn').style.display='none';
+    document.getElementById('tab-resultados').style.display='none';
   }
   // Carrega dados em background — se falhar, mantém a sessão
   try{
