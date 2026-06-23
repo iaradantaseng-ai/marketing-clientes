@@ -1337,6 +1337,7 @@ function salvarGS(){}
 function desconectarGS(){}
 function atualizarBadgeGS(){
   const btn=document.getElementById('gs-btn'),lbl=document.getElementById('gs-label');
+  if(btn)btn.style.display='inline-flex';
   if(btn)btn.classList.add('connected');
   if(lbl)lbl.textContent='Supabase conectado';
 }
@@ -1416,6 +1417,7 @@ async function fazerLogin(){
       if(_usuario.perfil==='admin'){
         document.getElementById('empresa-bar').style.display='flex';
         document.getElementById('tab-resultados').style.display='flex';
+        document.getElementById('gs-btn').style.display='inline-flex';
         await _carregarEmpresas();
       }else{
         document.getElementById('cliente-bar').style.display='flex';
