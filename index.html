@@ -367,6 +367,7 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
   <button class="nav-tab" onclick="goTab('lista',this)"><i class="ti ti-list"></i> Lista <span class="nav-badge" id="badge-atrasados" style="display:none">0</span></button>
   <button class="nav-tab" onclick="goTab('kanban',this)"><i class="ti ti-layout-kanban"></i> Kanban</button>
   <button class="nav-tab" onclick="goTab('equipe',this)"><i class="ti ti-users"></i> Equipe</button>
+  <button class="nav-tab" onclick="goTab('planejamento',this)"><i class="ti ti-calendar-time"></i> Planejamento</button>
   <button class="nav-tab" onclick="goTab('relatorio',this)"><i class="ti ti-file-text"></i> Relatório</button>
   <button class="nav-tab admin-only" id="tab-resultados" style="display:none" onclick="goTab('resultados',this)"><i class="ti ti-chart-bar"></i> Resultados</button>
   <button class="nav-add" onclick="goTab('cadastro',null)"><i class="ti ti-plus"></i> Novo entregável</button>
@@ -501,6 +502,25 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
 </div>
 
 <!-- PÁGINA RESULTADOS (só admin) -->
+<!-- PÁGINA PLANEJAMENTO / GANTT -->
+<div class="page" id="page-planejamento">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="font-size:16px;font-weight:700;color:var(--text)"><i class="ti ti-calendar-time" style="color:var(--blue);margin-right:6px"></i>Planejamento de Campanhas</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="gantt-filtro-empresa" onchange="renderGantt()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;background:#fff">
+        <option value="">— Todas as empresas —</option>
+      </select>
+      <select id="gantt-filtro-mes" onchange="renderGantt()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;background:#fff">
+        <option value="">— Todos os meses —</option>
+      </select>
+      <button id="btn-nova-campanha" onclick="abrirModalCampanha()" style="padding:8px 16px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;display:none;align-items:center;gap:6px"><i class="ti ti-plus"></i> Nova campanha</button>
+    </div>
+  </div>
+  <div id="gantt-container" style="overflow-x:auto;background:#fff;border-radius:12px;border:1px solid var(--border);box-shadow:var(--shadow-sm)">
+    <div id="gantt-content" style="min-width:700px;padding:1rem"></div>
+  </div>
+</div>
+
 <div class="page" id="page-resultados">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
     <h2 style="font-size:16px;font-weight:700;color:var(--text)"><i class="ti ti-chart-bar" style="color:var(--blue);margin-right:6px"></i>Resultados de Campanhas</h2>
@@ -808,7 +828,7 @@ function limparFiltros(){
   atualizarPeriodoLabel();renderAtivo();
 }
 function populateFilterSelects(){const camps=[...new Set(dados.map(d=>d.camp).filter(Boolean))].sort();const profs=[...new Set(dados.map(d=>d.resp).filter(Boolean))].sort();const fc=document.getElementById('f-campanha');const fe=document.getElementById('f-equipe');const cv=fc.value,ev=fe.value;fc.innerHTML='<option value="">Todas as campanhas</option>'+camps.map(c=>`<option value="${c}">${c}</option>`).join('');fe.innerHTML='<option value="">Toda a equipe</option>'+profs.map(p=>`<option value="${p}">${p}</option>`).join('');fc.value=cv;fe.value=ev;}
-function goTab(id,el){document.querySelectorAll('.page,.page-full').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');if(el)el.classList.add('active');if(id==='dashboard')renderDashboard();else if(id==='lista')renderLista();else if(id==='kanban')renderKanban();else if(id==='equipe')renderEquipe();else if(id==='relatorio')gerarRelatorio();else if(id==='resultados')renderResultados();else if(id==='cadastro'){atualizarSelectsFuncao();atualizarMembrosPorFuncao('f-func','f-resp');}}
+function goTab(id,el){document.querySelectorAll('.page,.page-full').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');if(el)el.classList.add('active');if(id==='dashboard')renderDashboard();else if(id==='lista')renderLista();else if(id==='kanban')renderKanban();else if(id==='equipe')renderEquipe();else if(id==='relatorio')gerarRelatorio();else if(id==='resultados')renderResultados();else if(id==='planejamento')renderGantt();else if(id==='cadastro'){atualizarSelectsFuncao();atualizarMembrosPorFuncao('f-func','f-resp');}}
 function renderAtivo(){const aba=document.querySelector('.page.active,.page-full.active');if(!aba)return;const id=aba.id.replace('page-','');if(id==='dashboard')renderDashboard();else if(id==='lista')renderLista();else if(id==='kanban')renderKanban();else if(id==='relatorio')gerarRelatorio();else if(id==='equipe'){const perf=document.getElementById('equipe-perfil');if(perf.style.display!=='none'){const nm=perf.querySelector('.perfil-name')?.textContent;if(nm)abrirPerfil(nm);else renderEquipe();}else renderEquipe();}}
 function comprimirFoto(file,cb){
   const reader=new FileReader();
@@ -1398,6 +1418,40 @@ let _usuario=null;
 let _empresas=[];
 let _empresaFiltro='';
 
+function aplicarPermissoes(){
+  const perfil=_usuario?.perfil||'cliente';
+  const perm=_usuario?.permissoes||{};
+
+  // Helper
+  const isAdmin=perfil==='admin';
+  const isColab=perfil==='colaborador';
+  const isCliente=perfil==='cliente';
+
+  // Badge Supabase
+  document.getElementById('gs-btn').style.display=isAdmin?'inline-flex':'none';
+
+  // Aba Resultados — só admin
+  document.getElementById('tab-resultados').style.display=isAdmin?'flex':'none';
+
+  // Botão Nova campanha — admin sempre, colaborador se tiver permissão
+  const podeNovaCamp=isAdmin||(isColab&&perm.campanha);
+  document.getElementById('btn-nova-campanha').style.display=podeNovaCamp?'inline-flex':'none';
+
+  // Botão Novo entregável — admin e colaborador
+  document.querySelectorAll('.nav-add').forEach(b=>b.style.display=isCliente?'none':'');
+
+  // Barra de empresa/cliente
+  if(isAdmin){
+    document.getElementById('empresa-bar').style.display='flex';
+    document.getElementById('cliente-bar').style.display='none';
+  }else{
+    document.getElementById('empresa-bar').style.display='none';
+    document.getElementById('cliente-bar').style.display='flex';
+    document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa||'';
+    _empresaFiltro=_usuario.empresa||'';
+  }
+}
+
 async function fazerLogin(){
   const u=document.getElementById('l-usuario').value.trim();
   const s=document.getElementById('l-senha').value.trim();
@@ -1405,33 +1459,22 @@ async function fazerLogin(){
   const btn=document.getElementById('btn-login');
   btn.innerHTML='<i class="ti ti-loader"></i> Entrando...';btn.disabled=true;
   try{
-    // Busca usuário por login + senha
     const rows=await sbGet('usuarios',`login=eq.${encodeURIComponent(u)}&senha=eq.${encodeURIComponent(s)}&select=*`);
     if(rows&&rows.length>0){
       _usuario={ok:true,...rows[0]};
+      _usuario.permissoes=_usuario.permissoes||{};
       localStorage.setItem('mkt_sessao',JSON.stringify(_usuario));
-      // Log após carregar dados (registrarLog precisa de _usuario)
       setTimeout(()=>registrarLog('Login','Acesso realizado por '+(_usuario.login||'')),2000);
       document.getElementById('login-page').style.display='none';
       document.getElementById('app-main').style.display='block';
-      if(_usuario.perfil==='admin'){
-        document.getElementById('empresa-bar').style.display='flex';
-        document.getElementById('tab-resultados').style.display='flex';
-        document.getElementById('gs-btn').style.display='inline-flex';
-        await _carregarEmpresas();
-      }else{
-        document.getElementById('cliente-bar').style.display='flex';
-        document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa||'';
-        _empresaFiltro=_usuario.empresa||'';
-        // Cliente pode cadastrar entregáveis, mas não gerenciar
-        document.getElementById('gs-btn').style.display='none';
-        document.getElementById('tab-resultados').style.display='none';
-      }
+      aplicarPermissoes();
+      if(_usuario.perfil==='admin') await _carregarEmpresas();
       await _carregarDadosCliente();
       await carregarFuncoes();
       await carregarEquipe();
+      await carregarPlanejamentos();
+      await atualizarSelectCampanhas();
       renderDashboard();
-        // Atualiza dados a cada 60s em tempo real
       setInterval(()=>_carregarDadosCliente(),60000);
     }else{
       document.getElementById('login-error').style.display='flex';
@@ -1616,10 +1659,34 @@ async function admAbrirSecao(secao){
       <div class="fg"><label>Usuário</label><input id="adm-user" type="text"></div>
       <div class="fg"><label>Senha</label><input id="adm-pass" type="password"></div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Empresa</label>
-      <select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select>
+    <div class="fg" style="margin-bottom:10px"><label>E-mail <span style="font-weight:400;color:var(--text3)">(para envio das credenciais)</span></label><input id="adm-email" type="email" placeholder="cliente@gmail.com"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="fg"><label>Perfil</label>
+        <select id="adm-perfil" onchange="admTogglePermissoes()" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%">
+          <option value="cliente">Cliente — só visualiza</option>
+          <option value="colaborador">Colaborador — opera e alimenta</option>
+        </select>
+      </div>
+      <div class="fg"><label>Empresa</label>
+        <select id="adm-emp" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%"></select>
+      </div>
     </div>
-    <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;margin-bottom:14px"><i class="ti ti-lock"></i> Criar acesso para empresa</button>
+    <!-- Permissões extras (só para colaborador) -->
+    <div id="adm-permissoes" style="display:none;background:var(--blue-light);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Permissões do colaborador</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="perm-campanha" style="width:15px;height:15px"> Criar campanhas no Planejamento
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="perm-equipe" style="width:15px;height:15px"> Cadastrar membros na Equipe
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="perm-todas-empresas" style="width:15px;height:15px"> Ver entregáveis de todas as empresas
+        </label>
+      </div>
+    </div>
+    <button onclick="admAddUsuario()" style="width:100%;padding:11px;font-size:13px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer;margin-bottom:14px"><i class="ti ti-lock"></i> Criar acesso</button>
     <select id="adm-busca-usuario" onchange="admFiltrarUsuarios()" style="font-size:12px;padding:7px 10px;border-radius:var(--r-sm);border:1.5px solid var(--border2);font-family:'Inter',sans-serif;margin-bottom:8px;width:100%;background:var(--white)"><option value="">— Ver acessos cadastrados —</option></select>
     <div id="adm-lista-usuarios" style="display:flex;flex-direction:column;gap:6px"></div>`;
 
@@ -1634,6 +1701,288 @@ async function admAbrirSecao(secao){
   </div>`;
   document.body.appendChild(div);
   await admCarregarListas();
+}
+
+// ══════ PLANEJAMENTO / GANTT ══════
+
+let _planejamentos=[];
+const GANTT_CORES=['#2B3FD4','#f06414','#16a34a','#dc2626','#7c3aed','#0891b2','#db2777','#d97706','#059669','#4f46e5'];
+
+async function carregarPlanejamentos(){
+  try{_planejamentos=await sbGet('planejamentos','select=*&order=data_inicio');}
+  catch(e){_planejamentos=[];}
+}
+
+async function renderGantt(){
+  const content=document.getElementById('gantt-content');
+  if(!content)return;
+  content.innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3);font-size:13px">Carregando...</div>';
+  await carregarPlanejamentos();
+
+  const selEmp=document.getElementById('gantt-filtro-empresa');
+  const selMes=document.getElementById('gantt-filtro-mes');
+  if(selEmp){
+    const empresas=[...new Set(_planejamentos.map(p=>p.empresa).filter(Boolean))];
+    _empresas.forEach(e=>{if(!empresas.includes(e.nome))empresas.push(e.nome);});
+    const curEmp=selEmp.value;
+    selEmp.innerHTML='<option value="">— Todas as empresas —</option>'+empresas.map(e=>`<option value="${e}"${e===curEmp?' selected':''}>${e}</option>`).join('');
+  }
+  if(selMes){
+    const meses=[];
+    const hoje=new Date();
+    for(let i=-2;i<=4;i++){
+      const d=new Date(hoje.getFullYear(),hoje.getMonth()+i,1);
+      const val=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const label=d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+      meses.push({val,label});
+    }
+    const curMes=selMes.value;
+    selMes.innerHTML='<option value="">— Todos os meses —</option>'+meses.map(m=>`<option value="${m.val}"${m.val===curMes?' selected':''}>${m.label}</option>`).join('');
+  }
+
+  // Para clientes: esconder select de empresa e filtrar automaticamente
+  if(selEmp){
+    if(_usuario?.perfil!=='admin'){
+      selEmp.style.display='none';
+    }else{
+      selEmp.style.display='';
+    }
+  }
+
+  const filtroEmp=_usuario?.perfil==='admin'?(selEmp?.value||''):(_empresaFiltro||'');
+  const filtroMes=selMes?.value||'';
+  let lista=_planejamentos;
+  if(filtroEmp) lista=lista.filter(p=>p.empresa===filtroEmp);
+  if(filtroMes) lista=lista.filter(p=>p.data_inicio?.startsWith(filtroMes)||p.data_fim?.startsWith(filtroMes));
+
+  if(!lista.length){
+    content.innerHTML=`<div style="text-align:center;padding:3rem;color:var(--text3)">
+      <i class="ti ti-calendar-off" style="font-size:40px;display:block;margin-bottom:12px;opacity:.3"></i>
+      Nenhuma campanha planejada ainda.<br>
+      ${_usuario?.perfil==='admin'?'<small style="color:var(--text3)">Clique em "+ Nova campanha" para começar.</small>':'<small style="color:var(--text3)">Aguarde o planejamento do seu gestor.</small>'}
+    </div>`;
+    return;
+  }
+
+  const datas=lista.flatMap(p=>[new Date(p.data_inicio+'T00:00:00'),new Date(p.data_fim+'T00:00:00')]);
+  let minData=new Date(Math.min(...datas));
+  let maxData=new Date(Math.max(...datas));
+  minData=new Date(minData.getFullYear(),minData.getMonth(),1);
+  maxData=new Date(maxData.getFullYear(),maxData.getMonth()+1,0);
+  const totalDias=Math.ceil((maxData-minData)/(1000*60*60*24))+1;
+
+  function posicao(dataStr){
+    const dias=Math.floor((new Date(dataStr+'T00:00:00')-minData)/(1000*60*60*24));
+    return Math.max(0,Math.min(100,(dias/totalDias)*100));
+  }
+  function largura(inicio,fim){
+    const dias=Math.floor((new Date(fim+'T00:00:00')-new Date(inicio+'T00:00:00'))/(1000*60*60*24))+1;
+    return Math.max(1,(dias/totalDias)*100);
+  }
+
+  // Gerar cabeçalho — meses e semanas
+  const mesesHeader=[];
+  const semanasHeader=[];
+  let curM=new Date(minData);
+  while(curM<=maxData){
+    const mesPos=posicao(curM.toISOString().split('T')[0]);
+    const fimMes=new Date(curM.getFullYear(),curM.getMonth()+1,0);
+    const fimMesReal=fimMes<maxData?fimMes:maxData;
+    const mesW=largura(curM.toISOString().split('T')[0],fimMesReal.toISOString().split('T')[0]);
+    mesesHeader.push({
+      label:curM.toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).toUpperCase(),
+      pos:mesPos,
+      w:mesW
+    });
+    // Semanas deste mês
+    let semD=new Date(curM);
+    let semN=1;
+    while(semD<=fimMes&&semD<=maxData){
+      const semFim=new Date(semD);
+      semFim.setDate(semFim.getDate()+6);
+      if(semFim>fimMes) semFim.setTime(fimMes.getTime());
+      if(semFim>maxData) semFim.setTime(maxData.getTime());
+      const sPos=posicao(semD.toISOString().split('T')[0]);
+      const sW=largura(semD.toISOString().split('T')[0],semFim.toISOString().split('T')[0]);
+      const dI=semD.toLocaleDateString('pt-BR',{day:'2-digit'});
+      const dF=semFim.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+      semanasHeader.push({label:`S${semN} ${dI}–${dF}`,pos:sPos,w:sW});
+      semD.setDate(semD.getDate()+7);
+      semN++;
+    }
+    curM=new Date(curM.getFullYear(),curM.getMonth()+1,1);
+  }
+
+  const hojeStr=new Date().toISOString().split('T')[0];
+  const hojePos=posicao(hojeStr);
+
+  let html=`<div style="position:relative">
+    <!-- Linha 1: Meses -->
+    <div style="display:flex;height:22px;margin-left:200px;position:relative;border-bottom:1px solid var(--border);margin-bottom:0">
+      ${mesesHeader.map(m=>`<div style="position:absolute;left:${m.pos}%;width:${m.w}%;height:100%;display:flex;align-items:center;padding-left:8px;border-left:1px solid var(--border);overflow:hidden">
+        <span style="font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;white-space:nowrap">${m.label}</span>
+      </div>`).join('')}
+    </div>
+    <!-- Linha 2: Semanas -->
+    <div style="display:flex;height:20px;margin-left:200px;position:relative;border-bottom:2px solid var(--border);margin-bottom:12px">
+      ${semanasHeader.map(s=>`<div style="position:absolute;left:${s.pos}%;width:${s.w}%;height:100%;display:flex;align-items:center;padding-left:4px;border-left:1px solid var(--border);overflow:hidden">
+        <span style="font-size:9px;font-weight:600;color:var(--text3);white-space:nowrap">${s.label}</span>
+      </div>`).join('')}
+    </div>
+    <!-- Linha de hoje -->
+    ${hojePos>=0&&hojePos<=100?`<div style="position:absolute;left:calc(200px + ${hojePos}% - 1px);top:0;bottom:0;width:2px;background:rgba(220,38,38,.5);z-index:2;pointer-events:none">
+      <div style="background:#dc2626;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;white-space:nowrap;margin-left:4px;margin-top:44px">Hoje</div>
+    </div>`:''}`;
+
+  lista.forEach((p,i)=>{
+    const cor=p.cor||GANTT_CORES[i%GANTT_CORES.length];
+    const left=posicao(p.data_inicio);
+    const w=largura(p.data_inicio,p.data_fim);
+    const entregaveis=dados.filter(d=>d.camp===p.campanha&&(!filtroEmp||d.empresa===filtroEmp));
+    const total=entregaveis.length;
+    const entregues=entregaveis.filter(d=>d.status==='entregue').length;
+    const pct=total?Math.round((entregues/total)*100):0;
+    const dtI=new Date(p.data_inicio+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+    const dtF=new Date(p.data_fim+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+
+    html+=`<div style="display:flex;align-items:center;margin-bottom:12px;min-height:40px">
+      <div style="width:200px;flex-shrink:0;padding-right:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${p.campanha}">${p.campanha}</div>
+        <div style="font-size:10px;color:var(--text3)">${p.empresa||''} · ${dtI}–${dtF}</div>
+      </div>
+      <div style="flex:1;position:relative;height:36px">
+        <div style="position:absolute;left:${left}%;width:${w}%;height:100%;background:${cor};border-radius:8px;display:flex;align-items:center;padding:0 10px;cursor:pointer;overflow:hidden;min-width:8px"
+          onclick="verDetalhesCampanha(${p.id})"
+          onmouseover="this.style.filter='brightness(.9)'" onmouseout="this.style.filter='none'">
+          <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:rgba(255,255,255,.2);pointer-events:none"></div>
+          <span style="font-size:11px;font-weight:700;color:#fff;white-space:nowrap;position:relative;z-index:1;overflow:hidden;text-overflow:ellipsis">${total?`${entregues}/${total} · ${pct}%`:p.descricao||p.campanha}</span>
+          ${_usuario?.perfil==='admin'?`<button onclick="event.stopPropagation();excluirCampanha(${p.id})" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.25);border:none;color:#fff;border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ti-x"></i></button>`:''}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  html+=`</div>`;
+  content.innerHTML=html;
+}
+
+function verDetalhesCampanha(id){
+  const p=_planejamentos.find(x=>x.id==id);
+  if(!p)return;
+  const entregaveis=dados.filter(d=>d.camp===p.campanha);
+  const total=entregaveis.length;
+  const entregues=entregaveis.filter(d=>d.status==='entregue').length;
+  const andamento=entregaveis.filter(d=>d.status==='andamento').length;
+  const atrasados=entregaveis.filter(d=>d.status==='atrasado').length;
+  const div=document.createElement('div');
+  div.style.cssText='position:fixed;inset:0;background:rgba(18,19,42,.55);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)';
+  div.onclick=e=>{if(e.target===div)div.remove();};
+  const dtI=new Date(p.data_inicio+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  const dtF=new Date(p.data_fim+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  div.innerHTML=`<div style="background:#fff;border-radius:16px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(43,63,212,.2)">
+    <div style="padding:1rem 1.25rem;background:${p.cor||'var(--blue)'};border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-size:15px;font-weight:700;color:#fff">${p.campanha}</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:2px">${p.empresa||''} · ${dtI} → ${dtF}</div></div>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div style="padding:1.25rem">
+      ${p.descricao?`<p style="font-size:13px;color:var(--text2);margin-bottom:14px">${p.descricao}</p>`:''}
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        <div style="background:var(--surface2);border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--blue)">${total}</div><div style="font-size:10px;color:var(--text3)">Total</div></div>
+        <div style="background:var(--ok-bg);border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--ok)">${entregues}</div><div style="font-size:10px;color:var(--text3)">Entregues</div></div>
+        <div style="background:var(--warn-bg);border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--warn)">${andamento}</div><div style="font-size:10px;color:var(--text3)">Andamento</div></div>
+        <div style="background:var(--danger-bg);border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:800;color:var(--danger)">${atrasados}</div><div style="font-size:10px;color:var(--text3)">Atrasados</div></div>
+      </div>
+      ${entregaveis.length?`<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:8px">Entregáveis</div>
+      <div style="display:flex;flex-direction:column;gap:6px">${entregaveis.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:8px">
+        <span class="status-badge ${e.status}" style="font-size:10px;padding:2px 8px;flex-shrink:0">${SC[e.status]?.label||e.status}</span>
+        <span style="flex:1;font-size:12px;color:var(--text)">${e.ativ}</span>
+        <span style="font-size:11px;color:var(--text3);flex-shrink:0">${e.resp}</span>
+      </div>`).join('')}</div>`:'<p style="font-size:12px;color:var(--text3);text-align:center;padding:1rem">Nenhum entregável vinculado ainda.</p>'}
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function abrirModalCampanha(){
+  const div=document.createElement('div');
+  div.id='modal-campanha-bg';
+  div.style.cssText='position:fixed;inset:0;background:rgba(18,19,42,.6);z-index:300;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)';
+  div.onclick=e=>{if(e.target===div)div.remove();};
+  const empresaOpts=_empresas.map(e=>`<option value="${e.nome}">${e.nome}</option>`).join('');
+  div.innerHTML=`<div style="background:#fff;border-radius:16px;width:100%;max-width:460px;box-shadow:0 12px 40px rgba(43,63,212,.2)">
+    <div style="padding:1rem 1.25rem;background:linear-gradient(135deg,var(--blue),var(--blue-dark));border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <h2 style="font-size:15px;font-weight:700;color:#fff"><i class="ti ti-calendar-plus" style="margin-right:8px"></i>Nova campanha</h2>
+      <button onclick="document.getElementById('modal-campanha-bg').remove()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px">✕</button>
+    </div>
+    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><label>Empresa *</label>
+          <select id="camp-empresa" style="font-size:13px;padding:10px 12px;border-radius:var(--r-sm);border:1.5px solid var(--border2);background:var(--surface2);color:var(--text);font-family:'Inter',sans-serif;width:100%">${empresaOpts}</select>
+        </div>
+        <div class="fg"><label>Nome da campanha *</label><input id="camp-nome" type="text" placeholder="Ex: Campanha Julho"></div>
+      </div>
+      <div class="fg"><label>Descrição</label><input id="camp-desc" type="text" placeholder="Opcional"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><label>Data início *</label><input id="camp-inicio" type="date"></div>
+        <div class="fg"><label>Data fim *</label><input id="camp-fim" type="date"></div>
+      </div>
+      <div class="fg"><label>Cor</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          ${GANTT_CORES.map((c,i)=>`<div onclick="selecionarCorCampanha('${c}',this)" style="width:28px;height:28px;border-radius:6px;background:${c};cursor:pointer;border:3px solid ${i===0?'#000':'transparent'};transition:all .15s" data-cor="${c}"></div>`).join('')}
+        </div>
+        <input type="hidden" id="camp-cor" value="${GANTT_CORES[0]}">
+      </div>
+      <button onclick="salvarCampanha()" style="width:100%;padding:12px;font-size:14px;font-weight:700;border-radius:var(--r-sm);background:var(--blue);color:#fff;border:none;cursor:pointer"><i class="ti ti-calendar-plus"></i> Criar campanha</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+
+function selecionarCorCampanha(cor,el){
+  document.querySelectorAll('#modal-campanha-bg [data-cor]').forEach(d=>d.style.border='3px solid transparent');
+  el.style.border='3px solid #000';
+  document.getElementById('camp-cor').value=cor;
+}
+
+async function salvarCampanha(){
+  const empresa=document.getElementById('camp-empresa')?.value;
+  const nome=document.getElementById('camp-nome')?.value.trim();
+  const desc=document.getElementById('camp-desc')?.value.trim()||'';
+  const inicio=document.getElementById('camp-inicio')?.value;
+  const fim=document.getElementById('camp-fim')?.value;
+  const cor=document.getElementById('camp-cor')?.value||GANTT_CORES[0];
+  if(!empresa||!nome||!inicio||!fim){alert('Preencha empresa, nome e datas.');return;}
+  if(new Date(fim)<new Date(inicio)){alert('Data fim não pode ser antes do início.');return;}
+  try{
+    await sbPost('planejamentos',{empresa,campanha:nome,descricao:desc,data_inicio:inicio,data_fim:fim,cor});
+    registrarLog('Campanha criada',`${nome} · ${empresa}`);
+    document.getElementById('modal-campanha-bg')?.remove();
+    await renderGantt();
+    await atualizarSelectCampanhas();
+  }catch(e){alert('Erro ao salvar: '+e);}
+}
+
+async function excluirCampanha(id){
+  if(!confirm('Excluir esta campanha do planejamento?'))return;
+  try{
+    await sbDelete('planejamentos',id);
+    registrarLog('Campanha excluída','ID: '+id);
+    await renderGantt();
+  }catch(e){alert('Erro: '+e);}
+}
+
+async function atualizarSelectCampanhas(){
+  await carregarPlanejamentos();
+  const opts='<option value="">Sem campanha</option>'+_planejamentos.map(p=>`<option value="${p.campanha}">${p.campanha} (${p.empresa})</option>`).join('');
+  ['f-camp','e-camp'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&el.tagName==='INPUT'){
+      const sel=document.createElement('select');
+      sel.id=id;sel.className=el.className;sel.style.cssText=el.style.cssText;
+      sel.innerHTML=opts;el.parentNode.replaceChild(sel,el);
+    }else if(el){el.innerHTML=opts;}
+  });
 }
 
 // ══════ RESULTADOS / MÉTRICAS COM IA ══════
@@ -2050,7 +2399,7 @@ function admFiltrarUsuarios(){
     <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);flex-wrap:wrap">
       <i class="ti ti-user" style="color:var(--blue);font-size:14px;flex-shrink:0"></i>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600">${u.login} <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;background:${u.perfil==='admin'?'var(--blue-light)':'var(--ok-bg)'};color:${u.perfil==='admin'?'var(--blue)':'var(--ok)'}">${u.perfil}</span></div>
+        <div style="font-size:13px;font-weight:600">${u.login} <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;background:${u.perfil==='admin'?'var(--blue-light)':u.perfil==='colaborador'?'var(--ok-bg)':'#fdf3d7'};color:${u.perfil==='admin'?'var(--blue)':u.perfil==='colaborador'?'var(--ok)':'var(--gold-dark)'}">${u.perfil}</span></div>
         <div style="font-size:11px;color:var(--text3)">${u.empresa||'—'}</div>
       </div>
       <button onclick="admAlterarSenha(${u.id},'${u.login.replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--border2);cursor:pointer;color:var(--text2);font-size:11px;padding:4px 8px;border-radius:4px;display:flex;align-items:center;gap:3px;white-space:nowrap"><i class="ti ti-key"></i> Senha</button>
@@ -2117,19 +2466,51 @@ async function admExcluirEmpresa(id,nome){
   }catch(e){alert('Erro ao excluir: '+e);}
 }
 
+function admTogglePermissoes(){
+  const perfil=document.getElementById('adm-perfil')?.value;
+  const div=document.getElementById('adm-permissoes');
+  if(div) div.style.display=perfil==='colaborador'?'block':'none';
+}
+
 async function admAddUsuario(){
   const u=document.getElementById('adm-user')?.value.trim();
   const s=document.getElementById('adm-pass')?.value.trim();
   const e=document.getElementById('adm-emp')?.value;
-  if(!u||!s||!e){alert('Preencha todos os campos');return;}
+  const email=document.getElementById('adm-email')?.value.trim()||'';
+  const perfil=document.getElementById('adm-perfil')?.value||'cliente';
+  if(!u||!s||!e){alert('Preencha usuário, senha e empresa.');return;}
+  const permissoes=perfil==='colaborador'?{
+    campanha:document.getElementById('perm-campanha')?.checked||false,
+    equipe:document.getElementById('perm-equipe')?.checked||false,
+    todas_empresas:document.getElementById('perm-todas-empresas')?.checked||false,
+  }:{};
   try{
-    await sbPost('usuarios',{login:u,senha:s,perfil:'cliente',empresa:e});
-    registrarLog('Admin · Acesso criado', `Usuário "${u}" para empresa "${e}"`);
+    await sbPost('usuarios',{login:u,senha:s,perfil,empresa:e,email,permissoes});
+    registrarLog('Admin · Acesso criado',`Usuário "${u}" · perfil: ${perfil} · empresa: "${e}"`);
+
+    // Enviar e-mail se tiver endereço
+    if(email){
+      try{
+        await fetch(`${SUPABASE_URL}/functions/v1/enviar-acesso`,{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization':'Bearer '+SUPABASE_KEY
+          },
+          body:JSON.stringify({email,login:u,senha:s,nome:e,tipo:perfil})
+        });
+      }catch(err){console.warn('Erro ao enviar e-mail:',err);}
+    }
+
     document.getElementById('adm-user').value='';
     document.getElementById('adm-pass').value='';
+    document.getElementById('adm-email').value='';
     await admCarregarListas();
-    alert('Usuário "'+u+'" criado para '+e+'!');
-  }catch(e){alert('Erro: '+e);}
+    alert(email
+      ?`Acesso "${u}" criado! Credenciais enviadas para ${email}.`
+      :`Acesso "${u}" criado! (Nenhum e-mail informado)`
+    );
+  }catch(err){alert('Erro: '+err);}
 }
 
 async function admAlterarSenha(id,login){
@@ -2225,25 +2606,17 @@ solicitarPermissaoNotificacao();
   const sessao=localStorage.getItem('mkt_sessao');
   if(!sessao)return;
   try{_usuario=JSON.parse(sessao);}catch(e){localStorage.removeItem('mkt_sessao');return;}
-  // Mostra app imediatamente sem esperar o banco
+  _usuario.permissoes=_usuario.permissoes||{};
   document.getElementById('login-page').style.display='none';
   document.getElementById('app-main').style.display='block';
-  if(_usuario.perfil==='admin'){
-    document.getElementById('empresa-bar').style.display='flex';
-    document.getElementById('tab-resultados').style.display='flex';
-  }else{
-    document.getElementById('cliente-bar').style.display='flex';
-    document.getElementById('cliente-empresa-nome').textContent=_usuario.empresa||'';
-    _empresaFiltro=_usuario.empresa||'';
-    document.getElementById('gs-btn').style.display='none';
-    document.getElementById('tab-resultados').style.display='none';
-  }
-  // Carrega dados em background — se falhar, mantém a sessão
+  aplicarPermissoes();
   try{
     if(_usuario.perfil==='admin') await _carregarEmpresas();
     await _carregarDadosCliente();
     await carregarFuncoes();
     await carregarEquipe();
+    await carregarPlanejamentos();
+    await atualizarSelectCampanhas();
     renderDashboard();
     setInterval(()=>_carregarDadosCliente(),60000);
   }catch(e){
