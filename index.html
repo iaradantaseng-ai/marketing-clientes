@@ -440,7 +440,8 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle;overflow:hidden;
   <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-bottom:1.25rem">
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="section-card"><h3><i class="ti ti-speakerphone"></i> Campanhas</h3><div id="dash-campanhas"></div></div>
-      <div class="section-card"><h3><i class="ti ti-trending-up"></i> Entregas por mês</h3><div style="display:flex;gap:12px;font-size:11px;color:var(--text3);margin-bottom:6px"><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:var(--blue);display:inline-block"></span>Entregues</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;border-top:2px dashed var(--ok);display:inline-block"></span>Meta</span></div><div id="chart-linha" style="width:100%;height:120px"></div></div>
+      <div class="section-card"><h3><i class="ti ti-chart-bar"></i> Previsto × Realizado por Mês</h3><div style="display:flex;gap:12px;font-size:11px;color:var(--text3);margin-bottom:6px"><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#f97316;display:inline-block"></span>Realizado</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#16a34a;display:inline-block"></span>Previsto</span></div><div id="chart-linha" style="width:100%;height:130px"></div></div>
+      <div class="section-card"><h3><i class="ti ti-trending-up"></i> Progresso do Projeto</h3><div style="display:flex;gap:12px;font-size:11px;color:var(--text3);margin-bottom:6px"><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#f97316;display:inline-block"></span>Realizado acum.</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;border-top:2px dashed #16a34a;display:inline-block"></span>Previsto acum.</span></div><div id="chart-progresso" style="width:100%;height:130px"></div></div>
     </div>
     <div class="section-card"><h3><i class="ti ti-users"></i> Equipe</h3><div id="dash-equipe"></div></div>
   </div>
@@ -1007,15 +1008,12 @@ function renderGraficos(fil){
     const labels=[],vals=[];
     // Descobre o mês mais recente com prazo entre todos os dados
     const hoje=new Date();
-    const datasRef=fil.filter(x=>x.prazo).map(x=>new Date(x.prazo+'T00:00:00'));
-    const maxData=datasRef.length?new Date(Math.max(...datasRef)):hoje;
-    const refAno=maxData.getFullYear(),refMes=maxData.getMonth();
-    for(let i=5;i>=0;i--){
-      let m=refMes-i,a=refAno+Math.floor((refMes-i)/12);
-      m=((m%12)+12)%12;
-      if(refMes-i<0)a=refAno-1;
-      const d=new Date(a,m,1);
-      labels.push(MN[d.getMonth()]);
+    // Meses fixos: Jun a Dez do ano corrente
+    const anoRef=hoje.getFullYear();
+    const mesesFixos=[5,6,7,8,9,10,11]; // Jun=5 ... Dez=11
+    for(const m of mesesFixos){
+      labels.push(MN[m]);
+      const d=new Date(anoRef,m,1);
       const qtd=fil.filter(x=>{
         if(x.status!=='entregue'||!x.entrega)return false;
         const e=new Date(x.entrega+'T00:00:00');
@@ -1023,35 +1021,93 @@ function renderGraficos(fil){
       }).length;
       vals.push(qtd);
     }
-    // Meta por mês = itens com prazo naquele mês
-    const metas=labels.map((_,i)=>{
-      let m=refMes-5+i,a=refAno+Math.floor((refMes-5+i)/12);
-      m=((m%12)+12)%12;
-      const d=new Date(a,m,1);
-      return fil.filter(x=>{
+    // Curva S: acumular realizado e previsto mês a mês
+    let acumPrev=0;
+    const metas=mesesFixos.map((m,i)=>{
+      const d=new Date(anoRef,m,1);
+      const qtdPrev=fil.filter(x=>{
         if(!x.prazo)return false;
         const p=new Date(x.prazo+'T00:00:00');
         return p.getFullYear()===d.getFullYear()&&p.getMonth()===d.getMonth();
       }).length;
+      return qtdPrev;
     });
-    const VW=400,VH=120,PL=24,PR=8,PT=10,PB=22;
+    // ── GRÁFICO 1: Barras agrupadas mês a mês ──
+    const maxV=Math.max(...metas,...vals,10); // mínimo 10 para escala adequada
+    const VW=400,VH=140,PL=28,PR=8,PT=12,PB=22;
     const cW=VW-PL-PR,cH=VH-PT-PB;
-    const maxV=Math.max(...vals,...metas,1);
-    const xp=i=>Math.round(PL+i*(cW/5));
+    const N=labels.length;
+    const grpW=Math.floor(cW/N);
+    const barW=Math.floor(grpW*0.35);
+    const gap=Math.floor(grpW*0.05);
+    const xp=i=>Math.round(PL+i*grpW);
     const yp=v=>Math.round(PT+cH-v/maxV*cH);
-    const area='M'+xp(0)+','+yp(vals[0])+' '+vals.slice(1).map((_,i)=>'L'+xp(i+1)+','+yp(vals[i+1])).join(' ')+' L'+xp(5)+','+(PT+cH)+' L'+xp(0)+','+(PT+cH)+' Z';
-    const line='M'+vals.map((v,i)=>xp(i)+','+yp(v)).join(' L');
-    const gridV=[0,Math.ceil(maxV/2),maxV];
-    const grid=gridV.map(v=>'<line x1="'+PL+'" y1="'+yp(v)+'" x2="'+(VW-PR)+'" y2="'+yp(v)+'" stroke="#e5e7eb" stroke-width="1"/><text x="'+(PL-3)+'" y="'+(yp(v)+4)+'" text-anchor="end" font-size="9" fill="#9090b0">'+v+'</text>').join('');
-    const dots=vals.map((v,i)=>'<circle cx="'+xp(i)+'" cy="'+yp(v)+'" r="4" fill="#2B3FD4" stroke="#fff" stroke-width="2"/>').join('');
-    const xlbls=labels.map((l,i)=>'<text x="'+xp(i)+'" y="'+(VH-4)+'" text-anchor="middle" font-size="10" fill="#9090b0">'+l+'</text>').join('');
-    lw.innerHTML='<svg viewBox="0 0 '+VW+' '+VH+'" width="100%" height="120" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+
-      grid+
-      '<path d="'+area+'" fill="rgba(43,63,212,0.07)"/>'+
-      '<polyline points="'+metas.map((m,i)=>xp(i)+','+yp(m)).join(' ')+'" fill="none" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="5,3"/>'+
-      metas.map((m,i)=>'<circle cx="'+xp(i)+'" cy="'+yp(m)+'" r="3" fill="#16a34a"/>').join('')+
-      '<path d="'+line+'" fill="none" stroke="#2B3FD4" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+
-      dots+xlbls+'</svg>';
+    // Eixo Y com 5 níveis bem distribuídos
+    const nTicks=5;
+    const tickStep=Math.ceil(maxV/(nTicks-1))||1;
+    const gridTicks=Array.from({length:nTicks},(_,i)=>i*tickStep).filter(v=>v<=maxV*1.1);
+    if(!gridTicks.includes(0))gridTicks.unshift(0);
+    const grid=gridTicks.map(v=>'<line x1="'+PL+'" y1="'+yp(v)+'" x2="'+(VW-PR)+'" y2="'+yp(v)+'" stroke="#e5e7eb" stroke-width="1"/><text x="'+(PL-4)+'" y="'+(yp(v)+4)+'" text-anchor="end" font-size="9" fill="#9090b0">'+v+'</text>').join('');
+    const barsPrev=metas.map((v,i)=>{
+      const x=Math.round(PL+i*grpW+grpW/2-barW-gap/2);
+      const bh=Math.max(Math.round(v/maxV*cH),0);
+      const y=PT+cH-bh;
+      const lbl=v>0?'<text x="'+(x+barW/2)+'" y="'+(y-3)+'" text-anchor="middle" font-size="8" fill="#16a34a" font-weight="600">'+v+'</text>':'';
+      return'<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+bh+'" rx="2" fill="#16a34a" opacity="0.85"/>'+lbl;
+    }).join('');
+    const barsReal=vals.map((v,i)=>{
+      const x=Math.round(PL+i*grpW+grpW/2+gap/2);
+      const bh=Math.max(Math.round(v/maxV*cH),0);
+      const y=PT+cH-bh;
+      const lbl=v>0?'<text x="'+(x+barW/2)+'" y="'+(y-3)+'" text-anchor="middle" font-size="8" fill="#f97316" font-weight="600">'+v+'</text>':'';
+      return'<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+bh+'" rx="2" fill="#f97316" opacity="0.9"/>'+lbl;
+    }).join('');
+    const xlbls=labels.map((l,i)=>'<text x="'+(Math.round(PL+i*grpW+grpW/2))+'" y="'+(VH-4)+'" text-anchor="middle" font-size="10" fill="#9090b0">'+l+'</text>').join('');
+    lw.innerHTML='<svg viewBox="0 0 '+VW+' '+VH+'" width="100%" height="140" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+grid+barsPrev+barsReal+xlbls+'</svg>';
+
+    // ── GRÁFICO 2: Progresso acumulado em % ──
+    const lp=document.getElementById('chart-progresso');
+    if(lp){
+      let ap=0,ar=0;
+      const totalRef=Math.max(fil.length,1);
+      const prevAcum=metas.map(v=>{ap+=v;return Math.min(Math.round(ap/totalRef*100),100);});
+      const realAcum=vals.map(v=>{ar+=v;return Math.min(Math.round(ar/totalRef*100),100);});
+      const VW2=400,VH2=140,PL2=30,PR2=8,PT2=12,PB2=22;
+      const cW2=VW2-PL2-PR2,cH2=VH2-PT2-PB2;
+      const xp2=i=>Math.round(PL2+i*(cW2/6));
+      const yp2=pct=>Math.round(PT2+cH2-pct/100*cH2);
+      const gridPct=[0,25,50,75,100];
+      const grid2=gridPct.map(v=>'<line x1="'+PL2+'" y1="'+yp2(v)+'" x2="'+(VW2-PR2)+'" y2="'+yp2(v)+'" stroke="#e5e7eb" stroke-width="1"/><text x="'+(PL2-4)+'" y="'+(yp2(v)+4)+'" text-anchor="end" font-size="9" fill="#9090b0">'+v+'%</text>').join('');
+      // Bezier suavizado
+      function bezier(pts){
+        if(pts.length<2)return'';
+        let d='M'+pts[0][0]+','+pts[0][1];
+        for(let i=0;i<pts.length-1;i++){
+          const cpx=Math.round((pts[i][0]+pts[i+1][0])/2);
+          d+=' C'+cpx+','+pts[i][1]+' '+cpx+','+pts[i+1][1]+' '+pts[i+1][0]+','+pts[i+1][1];
+        }
+        return d;
+      }
+      // Realizado só até o mês atual — meses futuros ficam sem dados
+      const mesAtual=hoje.getMonth(),anoAtual=hoje.getFullYear();
+      const ptsPrev=prevAcum.map((v,i)=>[xp2(i),yp2(v)]);
+      // Filtra pontos de realizado apenas até o mês corrente
+      const ptsReal=realAcum.reduce((acc,v,i)=>{
+        const m=mesesFixos[i];
+        const anoM=anoRef;
+        if(anoM<anoAtual||(anoM===anoAtual&&m<=mesAtual))acc.push([xp2(i),yp2(v)]);
+        return acc;
+      },[]);
+      const dotsPrev=prevAcum.map((v,i)=>'<circle cx="'+xp2(i)+'" cy="'+yp2(v)+'" r="3" fill="#16a34a" stroke="#fff" stroke-width="1.5"/>').join('');
+      const dotsReal=ptsReal.map(([cx,cy])=>'<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#f97316" stroke="#fff" stroke-width="2"/>').join('');
+      const lblsPct=labels.map((l,i)=>'<text x="'+xp2(i)+'" y="'+(VH2-4)+'" text-anchor="middle" font-size="10" fill="#9090b0">'+l+'</text>').join('');
+      lp.innerHTML='<svg viewBox="0 0 '+VW2+' '+VH2+'" width="100%" height="140" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+
+        grid2+
+        '<path d="'+bezier(ptsPrev)+'" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="5,3" stroke-linejoin="round" stroke-linecap="round"/>'+
+        dotsPrev+
+        (ptsReal.length>1?'<path d="'+bezier(ptsReal)+'" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>':'')+
+        dotsReal+lblsPct+'</svg>';
+    }
   }
 }
 function navCalMes(dir){calNavOffset+=dir;renderCalendario(dadosFiltrados());}
